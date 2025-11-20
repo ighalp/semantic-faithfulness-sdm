@@ -35,7 +35,7 @@ The SDM framework models LLM question-answering as information flow through tran
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/semantic-faithfulness-sdm.git
+git clone https://github.com/ighalp/semantic-faithfulness-sdm.git
 cd semantic-faithfulness-sdm
 
 # Install dependencies
@@ -225,9 +225,9 @@ This paper introduces the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic E
 
 ## 📧 Contact
 
-Igor Halperin - [your-email@example.com]
+Igor Halperin
 
-Project Link: [https://github.com/yourusername/semantic-faithfulness-sdm](https://github.com/yourusername/semantic-faithfulness-sdm)
+Project Link: [https://github.com/ighalp/semantic-faithfulness-sdm](https://github.com/ighalp/semantic-faithfulness-sdm)
 
 ## 🙏 Acknowledgments
 
