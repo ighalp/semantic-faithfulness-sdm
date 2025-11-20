@@ -15,7 +15,7 @@ When LLMs generate answers based on provided context, how do we measure whether 
 - **Semantic Entropy Production (SEP)**: Measures irreversibility in the question-answering process using thermodynamic principles
 - **Upper-Bounded DIB (UDIB) Clustering**: Automated semantic topic discovery from text
 - **Black-box Evaluation**: Works with any LLM without requiring access to internal activations or logits
-- **Convex Optimization**: Guaranteed convergence to global optimum using Csiszár-Tusnády framework
+- **Convex Optimization**: Guaranteed convergence to global optimum using Csiszár-Tusnády/Blahut-Arimoto Alternating Minimization algorithm
 
 ### Theoretical Foundation
 
