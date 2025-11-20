@@ -26,8 +26,14 @@ The SDM framework models LLM question-answering as information flow through tran
 **Semantic Faithfulness** measures how closely the answer channel approximates the optimal goal channel by minimizing KL divergence.
 
 **Semantic Entropy Production** decomposes into:
-- System entropy: $\dot{S}_{\text{sys}} = H(A) - H(C)$ (semantic expansion/compression)
-- Total entropy: $\dot{S}_{\text{total}} \approx 1/\mathcal{F}_S - 1$ (divergence from optimality)
+- System entropy production: $\dot{S}_{\text{sys}} = H(A) - H(C)$ (semantic expansion/compression)
+- Total entropy production: $\dot{S}_{\text{total}} \approx 1/\mathcal{F}_S - 1$ (divergence from optimality)
+
+#### Core Algorithms and Principles
+
+- **Csiszár-Tusnády/Blahut-Arimoto alternating minimization** for computing optimal information channels
+- **Information geometry principles** from Amari for understanding divergence measures
+- **Stochastic thermodynamics** from Seifert and Parrondo for entropy production framework
 
 ## 🚀 Quick Start
 
@@ -255,6 +261,4 @@ Project Link: [https://github.com/ighalp/semantic-faithfulness-sdm](https://gith
 
 ## 🙏 Acknowledgments
 
-- Csiszár-Tusnády alternating minimization framework
-- Information geometry principles from Amari
-- Stochastic thermodynamics from Seifert and Parrondo
+This section is reserved for acknowledging future contributors and collaborators.
