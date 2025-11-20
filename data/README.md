@@ -137,7 +137,7 @@ If you use the NVIDIA 10-K example dataset, please cite our paper:
 
 ```bibtex
 @article{halperin2025faithfulness,
-  title={Information-Theoretic Faithfulness Metrics for Large Language Models},
+  title={Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations},
   author={Halperin, Igor},
   year={2025}
 }

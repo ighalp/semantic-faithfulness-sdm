@@ -199,7 +199,7 @@ If you use this package in your research, please cite:
 
 ```bibtex
 @article{halperin2025faithfulness,
-  title={Information-Theoretic Faithfulness Metrics for Large Language Models},
+  title={Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations},
   author={Halperin, Igor},
   note={To be published},
   year={2025}
@@ -220,7 +220,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### This Work
 
-**Halperin, I. (2025).** "Information-Theoretic Faithfulness Metrics for Large Language Models."
+**Halperin, I. (2025).** "Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations."
 *To be published soon.*
 
 This paper introduces the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic Entropy Production (SEP) metrics implemented in this package.
