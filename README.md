@@ -31,6 +31,28 @@ The SDM framework models LLM question-answering as information flow through tran
 
 ## 🚀 Quick Start
 
+### Demo Notebook (Recommended)
+
+The fastest way to get started is with our **comprehensive Jupyter notebook** that includes:
+- ✅ Step-by-step pipeline walkthrough
+- ✅ Multi-triplet batch analysis (10 QCA triplets from the paper)
+- ✅ Publication-quality visualizations (5 figures)
+- ✅ Pre-computed cache for instant reproducibility
+
+```bash
+# Clone and setup
+git clone https://github.com/ighalp/semantic-faithfulness-sdm.git
+cd semantic-faithfulness-sdm
+pip install -e .
+
+# Run the demo notebook
+jupyter notebook Semantic_Faithfulness_SDM_demo.ipynb
+```
+
+The notebook is divided into two parts:
+1. **Part I**: Single-triplet walkthrough (educational)
+2. **Part II**: Multi-triplet analysis with visualization suite (research)
+
 ### Installation
 
 ```bash

@@ -46,14 +46,21 @@ htmlcov/
 .tox/
 .hypothesis/
 
-# Data
+# Data - general patterns
 *.csv
+
+# Data files - ignore by default, except for committed cache
 *.json
 *.pkl
 *.npy
 *.npz
-data/cache/
-data/embeddings/
+
+# But allow cached demo data for reproducibility
+!data/cache/**/*.npz
+!data/cache/**/*.json
+!data/cache/**/*.pkl
+
+# Ignore dynamic results
 data/results/
 
 # API Keys and Secrets
@@ -81,3 +88,6 @@ site/
 *.tar.gz
 *.tar
 *.rar
+
+# Data directory - examples and cache are committed, results are not
+!data/examples/**/*.json

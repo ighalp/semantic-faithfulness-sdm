@@ -71,7 +71,28 @@ The package automatically caches:
 
 This significantly speeds up re-analysis of the same data.
 
-Cache files are named using content hashes to ensure consistency.
+### Pre-computed Cache (Committed for Reproducibility)
+
+For immediate reproducibility, this repository includes **pre-computed cached data**:
+
+- **`cache/embeddings/embeddings_v2.npz`** (5.5 MB)
+  - Sentence embeddings for all 10 QCA triplets
+  - Model: Qwen/Qwen3-Embedding-0.6B
+  - 23 semantic topics discovered via UDIB clustering
+
+- **`cache/distributions/distributions_v2.json`** (17 KB)
+  - Marginal probability distributions p(Q), p(C), p(A) for each triplet
+  - Cluster assignments and topic labels
+
+- **`cache/embeddings/cluster_labels_v2.npz`** (5.8 KB)
+  - UDIB cluster assignments for all sentences
+
+These files enable users to:
+- ✅ Run the demo notebook **immediately** without generating embeddings
+- ✅ Reproduce exact results from the paper
+- ✅ Compare their own implementations against reference outputs
+
+**Note:** To regenerate cache from scratch (e.g., for new data), simply delete these files and re-run the notebook or use the `generate_demo_cache.py` script.
 
 ## Example Datasets
 
