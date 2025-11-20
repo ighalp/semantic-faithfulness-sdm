@@ -5,7 +5,6 @@ Q-step enforces the marginal constraint: sum_i p_c[i] * Q[i,j] = p_q[j]
 """
 
 import numpy as np
-from scipy.optimize import minimize
 from scipy.stats import entropy
 
 
@@ -226,27 +225,3 @@ def compute_semantic_faithfulness(p_c, p_q, p_a, Q_init=None,
         'converged': converged,
         'convergence_history': convergence_history if debug else None
     }
-
-
-if __name__ == "__main__":
-    import json
-
-    print("\nTesting SF with proper constraint enforcement...")
-
-    with open('nvidia_rich_qca_results/cache/distributions.json', 'r') as f:
-        cache = json.load(f)
-
-    # Test with PROMPT_0
-    triplet = cache['triplets'][0]
-    print(f"\nTesting with: {triplet['prompt_id']}")
-
-    p_q = np.array(triplet['p_q'])
-    p_c = np.array(triplet['p_c'])
-    p_a = np.array(triplet['p_a'])
-
-    result = compute_semantic_faithfulness(p_c, p_q, p_a, debug=True)
-
-    print(f"\nReturned result:")
-    print(f"  F_S: {result['F_S']}")
-    print(f"  D_min: {result['D_min']}")
-    print(f"  Converged: {result['converged']}")
