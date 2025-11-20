@@ -189,45 +189,7 @@ class SemanticMutualInformationAnalyzer:
         self._plot_elbow_curve(k_values, inertias, elbow_k, run_prefix)
         return elbow_k
         
-    def _compute_normalized_entropy(self, topic_vector: np.ndarray) -> tuple[float, float]:
-        """
-        Computes Shannon entropy and its normalized version from a probabilistic topic vector.
-        (Corrected version: takes topic_vector as input)
-        """
-        k = len(topic_vector)
-        if k == 0:
-            return 0.0, 0.0
-        
-        # The topic_vector is already a probability distribution (probs)
-        H = entropy(topic_vector, base=2)
-        H_norm = H / np.log2(k) if k > 1 else 0.0
-        return H, H_norm
-        
 
-
-    # new function
-    # --- NEW: FUNCTION TO GET DOMINANT CLUSTER ASSIGNMENTS FOR AMI ---
-    def _get_dominant_cluster_assignments(self, sentences_by_group: list, all_labels: np.ndarray, num_prompts: int) -> list:
-        """
-        Assigns a single dominant cluster to each prompt and response set.
-        """
-        assignments = []
-        start_idx = num_prompts # Start index for answer sentences in all_labels
-        
-        # This part handles the responses
-        for group in sentences_by_group:
-            num_sents_in_group = sum(len(sub_group) for sub_group in group)
-            if num_sents_in_group == 0:
-                assignments.append(-1) # Placeholder for empty group
-                continue
-            
-            labels = all_labels[start_idx : start_idx + num_sents_in_group]
-            # Find the most frequent label (the mode)
-            dominant_cluster = np.bincount(labels).argmax()
-            assignments.append(dominant_cluster)
-            start_idx += num_sents_in_group
-            
-        return assignments
 
     # --- NEW: DHILLON IT CO-CLUSTERING IMPLEMENTATION ---
     def _kl_divergence(self, p, q):
@@ -241,149 +203,9 @@ class SemanticMutualInformationAnalyzer:
         return np.sum(p * np.log(p / q))
         
 
-     # --- NEW HELPER METHOD ---
-    def _calculate_info_from_contingency(self, table):
-        """Calculates entropy and mutual information from a contingency table."""
-        total = np.sum(table)
-        if total == 0:
-            return 0, 0, 0
-        
-        joint_prob = table / total
-        # Add a small epsilon to prevent log(0)
-        epsilon = 1e-12
-        
-        # Marginals
-        p_prompts = np.sum(joint_prob, axis=1)
-        p_answers = np.sum(joint_prob, axis=0)
-        
-        # Entropies
-        H_p = -np.sum(p_prompts * np.log2(p_prompts + epsilon))
-        H_a = -np.sum(p_answers * np.log2(p_answers + epsilon))
-        
-        # Mutual Information
-        mi = 0
-        for i in range(table.shape[0]):
-            for j in range(table.shape[1]):
-                if joint_prob[i, j] > 0:
-                    mi += joint_prob[i, j] * np.log2(joint_prob[i, j] / (p_prompts[i] * p_answers[j]) + epsilon)
-        
-        return mi, H_p, H_a
 
 
-    def _compute_mi_from_distributions(self, prompt_topic_vector, answer_topic_vector, N):
-        """
-        Computes MI from aggregate probabilistic topic vectors.
-        """
-        k = len(prompt_topic_vector)
-        # Marginals are the vectors themselves
-        p_prompt = prompt_topic_vector
-        p_answer = answer_topic_vector
 
-        # Estimate joint probability by assuming independence between the aggregate distributions
-        # This is a simplification; a more complex model might be needed for non-independent cases
-        joint_prob = np.outer(p_prompt, p_answer)
-
-        H_p = entropy(p_prompt, base=2)
-        H_a = entropy(p_answer, base=2)
-
-        mi = 0.0
-        for i in range(k):
-            for j in range(k):
-                if joint_prob[i, j] > 1e-12:
-                    mi += joint_prob[i, j] * np.log2(joint_prob[i, j] / (p_prompt[i] * p_answer[j]))
-        
-        nmi = mi / min(H_p, H_a) if min(H_p, H_a) > 0 else 0.0
-        return mi, nmi, H_p, H_a
-
-    # new version
-    def _refine_clusters_itcc(self,
-                              initial_labels: np.ndarray,
-                              sentence_owner_map: np.ndarray,
-                              num_prompts: int,
-                              num_answers: int,
-                              max_iters: int,
-                              convergence_threshold: float = 1e-3) -> np.ndarray:
-        """
-        [DEFINITIVE v6 - PURE ITCC]
-        This version abandons the flawed explicit regularization and implements the true,
-        stable objective of Information-Theoretic Co-Clustering: minimizing the loss
-        of mutual information, which is achieved by iteratively minimizing the KL-divergence
-        between sentence and topic distributions. The complexity reduction is an emergent
-        property of this process, not an explicit goal, which prevents collapse.
-        """
-        print(f"\n--- Starting ITCC Refinement (max_iters={max_iters}) [Pure ITCC Objective] ---")
-        
-        current_labels = initial_labels.copy()
-        num_topics = len(np.unique(initial_labels))
-        num_sentences = len(initial_labels)
-        num_documents = num_prompts + num_answers
-
-        previous_total_kl = float('inf')
-
-        # --- Main Optimization Loop ---
-        for iter_num in range(max_iters):
-            print(f"  --- Macro Iteration {iter_num + 1}/{max_iters} ---")
-            
-            # Use a separate array for the new assignments for a parallel update
-            new_labels = current_labels.copy()
-            
-            # 1. Compute Topic Prototypes p(Document | Topic) based on the state at the start of the iter
-            document_prototypes = np.zeros((num_topics, num_documents))
-            for i in range(num_sentences):
-                document_prototypes[current_labels[i], sentence_owner_map[i]] += 1
-            document_prototypes /= (np.sum(document_prototypes, axis=1, keepdims=True) + 1e-12)
-
-            # 2. Calculate the best new topic for each sentence
-            for i in range(num_sentences):
-                owner_idx = sentence_owner_map[i]
-                p_doc_given_s = np.zeros(num_documents)
-                p_doc_given_s[owner_idx] = 1.0
-                
-                costs = np.zeros(num_topics)
-                for t in range(num_topics):
-                    # The cost is simply the KL-divergence. No regularization.
-                    costs[t] = self._kl_divergence(p_doc_given_s, document_prototypes[t])
-                
-                best_topic = np.argmin(costs)
-                new_labels[i] = best_topic # Store decision in the temporary array
-
-            # 3. Apply all the changes at once
-            labels_at_start_of_iter = current_labels
-            current_labels = new_labels
-
-            # --- Diagnostics and Convergence Check ---
-            # The total loss is now the sum of the minimum KL divergences
-            total_kl_loss = 0.0
-            for i in range(num_sentences):
-                 owner_idx = sentence_owner_map[i]
-                 p_doc_given_s = np.zeros(num_documents)
-                 p_doc_given_s[owner_idx] = 1.0
-                 assigned_topic = current_labels[i]
-                 total_kl_loss += self._kl_divergence(p_doc_given_s, document_prototypes[assigned_topic])
-
-            total_labels_changed = np.sum(current_labels != labels_at_start_of_iter)
-            relative_change = float('inf')
-            if previous_total_kl < float('inf'):
-                relative_change = abs(previous_total_kl - total_kl_loss) / previous_total_kl
-
-            print(f"    - Labels changed in iteration : {total_labels_changed}")
-            print(f"    - Total KL Loss               : {total_kl_loss:.4f}")
-            print(f"    - Relative Loss Change        : {relative_change:.6f} (Threshold: {convergence_threshold})")
-
-            if relative_change < convergence_threshold:
-                print("  Convergence reached: Loss stabilized.")
-                break
-            if total_labels_changed == 0:
-                print("  Convergence reached: No labels changed.")
-                break
-            
-            previous_total_kl = total_kl_loss
-        
-        if iter_num == max_iters - 1:
-            print("  Warning: Max iterations reached.")
-
-        print("--- ITCC Refinement Finished ---")
-        return current_labels
 
 
         
@@ -563,41 +385,6 @@ class SemanticMutualInformationAnalyzer:
 
         final_num_clusters = len(np.unique(all_labels))
 
-        # # --- ADD THIS BLOCK TO GET THE ACTUAL NUMBER OF CLUSTERS ---
-        # # The number of unique labels in the output is the final number of clusters.
-        # # We use np.unique to find these.
-        # # This number should be identical to optimal_k_target, but this is the most robust way to confirm.
-        # final_num_clusters = len(np.unique(all_labels))
-
-        # print(f"  Initial clustering complete. Found {len(np.unique(all_labels))} topics.")
-        # print(f"Initial Geometric Clustering resulted in {final_num_clusters} final clusters.")
-
-
-        # # IT-based refinement of initial clustering
-        # # Create a map from sentence index to its owner document (prompt/answer)
-        # initial_labels = all_labels
-        # sentence_owner_map = []
-        # for i in range(len(prompt_sentences_by_prompt)):
-        #     sentence_owner_map.extend([i] * len(prompt_sentences_by_prompt[i]))
-        
-        # for i in range(len(answer_sentences_by_prompt_set)):
-        #     owner_id = i + len(prompt_sentences_by_prompt)
-        #     sentence_owner_map.extend([owner_id] * len(answer_sentences_by_prompt_set[i]))
-
-            
-        # all_labels = self._refine_clusters_itcc(
-        #     initial_labels=initial_labels,
-        #     sentence_owner_map=np.array(sentence_owner_map),
-        #     num_prompts=len(prompt_sentences_by_prompt),
-        #     num_answers=len(answer_sentences_by_prompt_set),
-        #     # alpha=alpha, # not used now
-        #     max_iters=max_iters,
-        #     convergence_threshold=convergence_threshold
-        # )
-        
-        
-        # --- END OF ADDED BLOCK ---
-        
         # Extract labels for each component (Q, C if present, A)
         prompt_labels_flat = all_labels[:len(all_prompt_sentences)]
         if has_context:
