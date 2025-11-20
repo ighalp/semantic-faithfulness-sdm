@@ -3,7 +3,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Python package implementing **information-theoretically principled metrics** for evaluating Large Language Model (LLM) faithfulness and semantic alignment with source contexts. The package provides the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic Entropy Production (SEP) metrics introduced in our paper.
+A Python package implementing **rigorous metrics derived from information theory and stochastic thermodynamics** for evaluating Large Language Model (LLM) faithfulness and semantic alignment with source contexts. The package provides the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic Entropy Production (SEP) metrics introduced in our paper.
 
 ## 📖 Overview
 
