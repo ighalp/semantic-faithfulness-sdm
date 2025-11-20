@@ -53,6 +53,8 @@ The notebook is divided into two parts:
 1. **Part I**: Single-triplet walkthrough (educational)
 2. **Part II**: Multi-triplet analysis with visualization suite (research)
 
+**Performance Note**: The notebook uses pre-computed cached distributions and does NOT regenerate embeddings. Full execution time for all 10 triplets is approximately 2-3 minutes, with most time spent on the Csiszár-Tusnády optimization algorithm (not embedding generation).
+
 ### Installation
 
 ```bash
@@ -144,7 +146,7 @@ Our experiments on NVIDIA 10-K financial disclosures show:
 | Metric | Group A (Comprehensive) | Group B (Focused) |
 |--------|------------------------|-------------------|
 | Mean $\mathcal{F}_S$ | 0.906 | 0.780 |
-| Mean SEP$_{\text{total}}$ | 0.102 bits | 0.294 bits |
+| Mean SEP<sub>total</sub> | 0.102 bits | 0.294 bits |
 | Question Structure | Multi-topic (4+ categories) | Single-topic (competitive) |
 
 **Key Finding**: Question semantic structure—not just entropy—drives faithfulness. Comprehensive questions with explicit structure achieve ~16% higher faithfulness.
