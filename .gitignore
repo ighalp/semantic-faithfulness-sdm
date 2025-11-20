@@ -37,6 +37,7 @@ env/
 # Jupyter
 .ipynb_checkpoints
 # Allow demo notebooks but ignore temp/checkpoint files
+demo_cache/
 
 # Testing
 .pytest_cache/
