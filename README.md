@@ -12,7 +12,7 @@ When LLMs generate answers based on provided context, how do we measure whether 
 ### Key Features
 
 - **Semantic Faithfulness ($\mathcal{F}_S$)**: Quantifies how well an LLM's answer aligns with the optimal information channel from context to question
-- **Semantic Entropy Production (SEP)**: Measures irreversibility in the question-answering process using thermodynamic principles
+- **Semantic Entropy Production (SEP)**: Computed as the sum of system entropy change and dissipated heat, SEP quantifies the degree of irreversibility in the LLM's answer generation process, grounded in stochastic thermodynamics
 - **Upper-Bounded DIB (UDIB) Clustering**: Automated semantic topic discovery from text
 - **Black-box Evaluation**: Works with any LLM without requiring access to internal activations or logits
 - **Convex Optimization**: Guaranteed convergence to global optimum using Csiszár-Tusnády/Blahut-Arimoto Alternating Minimization algorithm
@@ -31,9 +31,9 @@ The SDM framework models LLM question-answering as information flow through tran
 
 #### Core Algorithms and Principles
 
+- **Information theory and information geometry principles** for characterizing optimal divergence measures
 - **Csiszár-Tusnády/Blahut-Arimoto alternating minimization** for computing optimal information channels
-- **Information geometry principles** from Amari for understanding divergence measures
-- **Stochastic thermodynamics** from Seifert and Parrondo for entropy production framework
+- **Stochastic thermodynamics framework** for quantifying entropy production and system irreversibility
 
 ## 🚀 Quick Start
 
