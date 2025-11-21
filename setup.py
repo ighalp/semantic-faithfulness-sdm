@@ -22,11 +22,11 @@ setup(
     name="semantic-faithfulness-sdm",
     version="1.0.0",
     author="Igor Halperin",
-    author_email="your-email@example.com",
+    author_email="ighalp@gmail.com",
     description="Information-theoretic metrics for evaluating LLM faithfulness and semantic alignment",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/semantic-faithfulness-sdm",
+    url="https://github.com/ighalp/semantic-faithfulness-sdm",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -59,8 +59,8 @@ setup(
     },
     keywords="nlp, llm, faithfulness, information-theory, semantic-analysis, entropy, machine-learning",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/semantic-faithfulness-sdm/issues",
-        "Source": "https://github.com/yourusername/semantic-faithfulness-sdm",
-        "Documentation": "https://github.com/yourusername/semantic-faithfulness-sdm/docs",
+        "Bug Reports": "https://github.com/ighalp/semantic-faithfulness-sdm/issues",
+        "Source": "https://github.com/ighalp/semantic-faithfulness-sdm",
+        "Documentation": "https://github.com/ighalp/semantic-faithfulness-sdm/docs",
     },
 )
