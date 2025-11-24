@@ -1,0 +1,42 @@
+# GUI Framework
+nicegui>=3.0.0
+
+# Interactive Visualization
+plotly>=5.0.0
+
+# Core SDM Dependencies (from parent package)
+numpy>=1.21.0
+scipy>=1.7.0
+scikit-learn>=1.0.0
+
+# NLP and Embeddings
+sentence-transformers>=2.2.0
+nltk>=3.6
+
+# Optimal Transport
+POT>=0.8.0
+
+# Utilities
+kneed>=0.7.0
+
+# Visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+
+# Progress bars
+tqdm>=4.62.0
+
+# Export functionality
+reportlab>=4.0.0  # For PDF generation
+pandas>=1.3.0     # For CSV export
+
+# Optional: For LLM API calls
+openai>=1.0.0
+anthropic>=0.7.0
+python-dotenv>=0.19.0
+
+# Development Dependencies (optional)
+pytest>=7.0.0
+pytest-cov>=3.0.0
+black>=22.0.0
+flake8>=4.0.0

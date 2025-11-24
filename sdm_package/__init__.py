@@ -5,7 +5,8 @@ This package implements information-theoretically principled metrics for evaluat
 LLM faithfulness and semantic alignment with source contexts.
 
 Main Components:
-- SemanticMutualInformationAnalyzer: Core SDM framework for computing semantic metrics
+- SemanticFaithfulnessAnalyzer: Core SDM framework for computing Semantic Faithfulness (F_S)
+                                 and Semantic Entropy Production (SEP) metrics
 - DIBAnalyzer: Upper-Bounded Deterministic Information Bottleneck clustering
 - compute_semantic_faithfulness: Compute Semantic Faithfulness (F_S) and Entropy Production (SEP) metrics
 
@@ -19,12 +20,12 @@ Citation:
 __version__ = "1.0.0"
 __author__ = "Igor Halperin"
 
-from .SDM import SemanticMutualInformationAnalyzer
+from .SDM import SemanticFaithfulnessAnalyzer
 from .DIB_with_KL_upper_bound import DIBAnalyzer
 from .compute_semantic_faithfulness import compute_semantic_faithfulness
 
 __all__ = [
-    'SemanticMutualInformationAnalyzer',
+    'SemanticFaithfulnessAnalyzer',
     'DIBAnalyzer',
     'compute_semantic_faithfulness',
 ]

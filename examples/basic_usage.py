@@ -9,7 +9,7 @@ for a question-context-answer triplet.
 import sys
 sys.path.append('..')
 
-from sdm_package import SemanticMutualInformationAnalyzer, compute_semantic_faithfulness
+from sdm_package import SemanticFaithfulnessAnalyzer, compute_semantic_faithfulness
 
 def main():
     # Example QCA triplet
@@ -37,7 +37,7 @@ def main():
 
     # Initialize the analyzer
     print("\nInitializing semantic analyzer...")
-    analyzer = SemanticMutualInformationAnalyzer(
+    analyzer = SemanticFaithfulnessAnalyzer(
         embedding_model_name="sentence-transformers/all-MiniLM-L6-v2",
         clustering_method="udib",  # Upper-Bounded DIB
         verbose=True

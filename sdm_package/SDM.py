@@ -46,10 +46,13 @@ import ot
 
 from DIB_with_KL_upper_bound import DIBAnalyzer
 
-class SemanticMutualInformationAnalyzer:
+class SemanticFaithfulnessAnalyzer:
     """
-    Implements the Semantic Mutual Information (SMI) method for hallucination detection.
-    (Version 3: Includes plotting and result summarization)
+    Analyzes semantic faithfulness and entropy production in LLM question-answering.
+
+    Computes Semantic Faithfulness (F_S) and Semantic Entropy Production (SEP) metrics
+    to measure how faithfully an LLM's answer represents information from a provided context.
+    Includes LLM generation, embedding, clustering, and visualization capabilities.
     """
     def __init__(self,
                  llm_client: OpenAI,

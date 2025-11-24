@@ -1,0 +1,14 @@
+# Environment variables (contains API keys)
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# NiceGUI runtime
+.nicegui/
+
+# Test files and logs
+test_*.py
+*.log

@@ -10,7 +10,7 @@ sys.path.append('..')
 
 import json
 import numpy as np
-from sdm_package import SemanticMutualInformationAnalyzer, compute_semantic_faithfulness
+from sdm_package import SemanticFaithfulnessAnalyzer, compute_semantic_faithfulness
 
 def main():
     print("="*80)
@@ -43,7 +43,7 @@ def main():
 
     # Initialize analyzer once (shared clustering across all triplets)
     print("\nInitializing semantic analyzer...")
-    analyzer = SemanticMutualInformationAnalyzer(
+    analyzer = SemanticFaithfulnessAnalyzer(
         embedding_model_name="sentence-transformers/all-MiniLM-L6-v2",
         clustering_method="udib",
         verbose=False

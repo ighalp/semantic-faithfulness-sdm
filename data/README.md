@@ -111,13 +111,13 @@ Located in: `examples/nvidia_10k_sample.json`
 1. **Prepare QCA triplets** in the JSON format above
 2. **Run analysis**:
    ```python
-   from sdm_package import SemanticMutualInformationAnalyzer
+   from sdm_package import SemanticFaithfulnessAnalyzer
    import json
 
    with open('data/examples/my_dataset.json', 'r') as f:
        data = json.load(f)
 
-   analyzer = SemanticMutualInformationAnalyzer()
+   analyzer = SemanticFaithfulnessAnalyzer()
    # ... analysis code ...
    ```
 

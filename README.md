@@ -78,10 +78,10 @@ pip install -e .
 ### Basic Usage
 
 ```python
-from sdm_package import SemanticMutualInformationAnalyzer, compute_semantic_faithfulness
+from sdm_package import SemanticFaithfulnessAnalyzer, compute_semantic_faithfulness
 
 # Initialize analyzer
-analyzer = SemanticMutualInformationAnalyzer(
+analyzer = SemanticFaithfulnessAnalyzer(
     embedding_model_name="sentence-transformers/all-MiniLM-L6-v2",
     clustering_method="udib"  # Upper-Bounded DIB
 )
@@ -111,14 +111,14 @@ print(f"System Entropy Production: {results['SEP_system']:.3f} bits")
 
 ```python
 import json
-from sdm_package import SemanticMutualInformationAnalyzer, compute_semantic_faithfulness
+from sdm_package import SemanticFaithfulnessAnalyzer, compute_semantic_faithfulness
 
 # Load your QCA triplets
 with open('data/qca_triplets.json', 'r') as f:
     triplets = json.load(f)
 
 # Analyze all triplets
-analyzer = SemanticMutualInformationAnalyzer()
+analyzer = SemanticFaithfulnessAnalyzer()
 results = []
 
 for triplet in triplets:
