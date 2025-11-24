@@ -150,12 +150,14 @@ class SemanticFaithfulnessAnalyzer:
         return all_answers
 
     def _split_into_sentences(self, text: str) -> list[str]:
-        text = re.sub(r'\s+', ' ', text).strip()
-        sentences = sent_tokenize(text)
-        return [s for s in sentences if s]
+        """Wrapper for text_utils.split_into_sentences for backward compatibility"""
+        from sdm_package.text_utils import split_into_sentences
+        return split_into_sentences(text)
 
     def _embed_texts(self, texts: list[str]) -> np.ndarray:
-        return self.embedding_model.encode(texts, show_progress_bar=True, batch_size=8)  # Reduced for MPS memory
+        """Wrapper for text_utils.embed_texts for backward compatibility"""
+        from sdm_package.text_utils import embed_texts
+        return embed_texts(self.embedding_model, texts, show_progress_bar=True, batch_size=8)
 
     # --- NEW PLOTTING FUNCTION FOR ELBOW METHOD ---
     def _plot_elbow_curve(self, k_values, inertias, elbow_k, run_prefix):

@@ -390,11 +390,11 @@ def create():
                         ui.label('Embedding Model').classes('text-subtitle2 font-bold mb-2')
                         form_data['embedding_model'] = ui.select(
                             options=[
+                                'Qwen/Qwen3-Embedding-0.6B',
                                 'sentence-transformers/all-MiniLM-L6-v2',
-                                'sentence-transformers/all-mpnet-base-v2',
-                                'Qwen/Qwen3-Embedding-0.6B'
+                                'sentence-transformers/all-mpnet-base-v2'
                             ],
-                            value='sentence-transformers/all-MiniLM-L6-v2'
+                            value='Qwen/Qwen3-Embedding-0.6B'
                         ).classes('w-full')
 
                     # Clustering method

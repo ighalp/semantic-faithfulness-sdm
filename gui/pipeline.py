@@ -257,8 +257,10 @@ class SemanticFaithfulnessPipeline:
             await self._update_progress("Computing embeddings", 3, 5,
                                        "Checking cache...")
 
-            # Process all triplets - either from cache or compute
-            distributions_list = []
+            # First pass: check cache and collect uncached triplets
+            distributions_list = [None] * len(triplets)  # Placeholder list
+            uncached_triplets = []
+            uncached_indices = []
 
             for i, triplet in enumerate(triplets):
                 # Check cache first
@@ -274,92 +276,68 @@ class SemanticFaithfulnessPipeline:
 
                 if cached_dist is not None:
                     # Use cached distributions
-                    distributions_list.append({
+                    distributions_list[i] = {
                         'prompt_id': triplet['prompt_id'],
                         'p_q': cached_dist['distributions']['p_q'],
                         'p_c': cached_dist['distributions']['p_c'],
                         'p_a': cached_dist['distributions']['p_a']
-                    })
-                    cache_stats['distributions_cached'] += 1
-                    await self._update_progress("Computing embeddings", 3, 5,
-                                               f"Processing triplet {i+1}/{len(triplets)} (cached)")
-                else:
-                    # Compute distributions (following notebook pattern)
-                    # Import heavy modules only when cache miss occurs
-                    import sys
-                    sys.path.insert(0, str(Path(__file__).parent.parent))
-                    from sentence_transformers import SentenceTransformer
-                    from nltk.tokenize import sent_tokenize
-                    from sdm_package.DIB_with_KL_upper_bound import DIBAnalyzer
-
-                    # Ensure NLTK punkt tokenizer is available
-                    try:
-                        import nltk
-                        nltk.data.find('tokenizers/punkt')
-                    except LookupError:
-                        nltk.download('punkt', quiet=True)
-
-                    await self._update_progress("Computing embeddings", 3, 5,
-                                               f"Processing triplet {i+1}/{len(triplets)} (computing)")
-
-                    # Step 4a: Tokenize into sentences
-                    question_sentences = sent_tokenize(triplet['question'].strip())
-                    context_sentences = sent_tokenize(triplet['context'].strip())
-                    answer_sentences = sent_tokenize(triplet['answer'].strip())
-                    all_sentences = question_sentences + context_sentences + answer_sentences
-
-                    # Step 4b: Generate embeddings
-                    def generate_embeddings():
-                        model = SentenceTransformer(embedding_model)
-                        return model.encode(all_sentences, show_progress_bar=False)
-
-                    embeddings = await asyncio.to_thread(generate_embeddings)
-
-                    # Step 4c: Cluster using DIB
-                    def run_clustering():
-                        import numpy as np
-                        tau_values = np.logspace(-2, 2, 30)
-                        max_n_clusters = 15
-
-                        dib_analyzer = DIBAnalyzer(embeddings, all_sentences)
-                        dib_analyzer.run(tau_values, max_n_clusters=max_n_clusters, seed=42)
-                        recommendation, _ = dib_analyzer.get_recommendation(min_clusters=3, metric='kink_angle')
-
-                        return recommendation['assignments'], recommendation['n_clusters']
-
-                    assignments, n_topics = await asyncio.to_thread(run_clustering)
-
-                    # Step 4d: Compute probability distributions
-                    def compute_distributions_from_assignments():
-                        import numpy as np
-
-                        n_q = len(question_sentences)
-                        n_c = len(context_sentences)
-                        n_a = len(answer_sentences)
-
-                        assignments_q = assignments[:n_q]
-                        assignments_c = assignments[n_q:n_q+n_c]
-                        assignments_a = assignments[n_q+n_c:]
-
-                        def to_distribution(assigns, n_topics):
-                            counts = np.bincount(assigns, minlength=n_topics)
-                            return (counts / counts.sum()).tolist()
-
-                        return {
-                            'p_q': to_distribution(assignments_q, n_topics),
-                            'p_c': to_distribution(assignments_c, n_topics),
-                            'p_a': to_distribution(assignments_a, n_topics)
-                        }
-
-                    dist_dict = await asyncio.to_thread(compute_distributions_from_assignments)
-
-                    dist_data = {
-                        'prompt_id': triplet['prompt_id'],
-                        'p_q': dist_dict['p_q'],
-                        'p_c': dist_dict['p_c'],
-                        'p_a': dist_dict['p_a']
                     }
-                    distributions_list.append(dist_data)
+                    cache_stats['distributions_cached'] += 1
+                else:
+                    # Collect for batch processing
+                    uncached_triplets.append({
+                        'question': triplet['question'],
+                        'context': triplet['context'],
+                        'answer': triplet['answer'],
+                        'prompt_id': triplet.get('prompt_id', 'unknown')
+                    })
+                    uncached_indices.append(i)
+
+            await self._update_progress("Computing embeddings", 3, 5,
+                                       f"Found {cache_stats['distributions_cached']} cached, {len(uncached_triplets)} to compute")
+
+            # Batch process all uncached triplets in ONE subprocess call (loads model once)
+            if uncached_triplets:
+                await self._update_progress("Computing embeddings", 3, 5,
+                                           f"Loading embedding model and processing {len(uncached_triplets)} triplets...")
+
+                def run_embedding_worker_batch():
+                    import subprocess
+                    import sys
+
+                    worker_script = Path(__file__).parent / 'embedding_worker.py'
+                    input_data = {
+                        'triplets': uncached_triplets,  # Batch of all uncached triplets
+                        'embedding_model': embedding_model,
+                        'clustering_method': clustering_method
+                    }
+
+                    # Run subprocess (model loaded ONCE for all triplets)
+                    result = subprocess.run(
+                        [sys.executable, str(worker_script)],
+                        input=json.dumps(input_data),
+                        capture_output=True,
+                        text=True,
+                        timeout=1200  # 20 minute timeout (Qwen3 model is large and needs time to load)
+                    )
+
+                    if result.returncode != 0:
+                        raise RuntimeError(f"Embedding worker failed: {result.stderr}")
+
+                    # Parse result
+                    output_data = json.loads(result.stdout)
+                    if not output_data['success']:
+                        raise RuntimeError(f"Embedding worker error: {output_data.get('error', 'Unknown error')}")
+
+                    return output_data['results']  # Returns list of all results
+
+                # Run in thread to avoid blocking async loop
+                computed_distributions = await asyncio.to_thread(run_embedding_worker_batch)
+
+                # Insert computed distributions back into the list and save to cache
+                for idx, dist_data in zip(uncached_indices, computed_distributions):
+                    distributions_list[idx] = dist_data
+                    triplet = triplets[idx]
 
                     # Save to cache
                     self.cache.save_distributions(
@@ -374,7 +352,7 @@ class SemanticFaithfulnessPipeline:
                             'p_a': dist_data['p_a']
                         }
                     )
-                    cache_stats['distributions_computed'] += 1
+                cache_stats['distributions_computed'] = len(uncached_triplets)
 
             # Save distributions
             distributions_data = {
