@@ -101,6 +101,7 @@ if __name__ == '__main__':
                 clustering_method=input_data['clustering_method']
             )
             json.dump({'success': True, 'results': results}, sys.stdout)
+            sys.stdout.flush()  # Ensure output is sent immediately
         else:
             # Single triplet (backward compatibility)
             result = compute_distributions_subprocess(
@@ -109,10 +110,12 @@ if __name__ == '__main__':
                 clustering_method=input_data['clustering_method']
             )
             json.dump({'success': True, 'result': result}, sys.stdout)
+            sys.stdout.flush()  # Ensure output is sent immediately
 
         sys.exit(0)
 
     except Exception as e:
-        # Write error to stdout
+        # Write error to stdout with explicit flush
         json.dump({'success': False, 'error': str(e), 'type': type(e).__name__}, sys.stdout)
+        sys.stdout.flush()
         sys.exit(1)

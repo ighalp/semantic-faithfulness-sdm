@@ -13,6 +13,65 @@ from llm_client import LLMClient, LLMProvider, LLMModel
 from cache_manager import CacheManager
 
 
+# Global variable for worker process (each worker gets its own copy with spawn)
+_worker_model = None
+
+
+def _init_embedding_worker(model_name: str):
+    """
+    Initialize worker process with embedding model.
+
+    This function is called once per worker process when the ProcessPoolExecutor
+    starts up. With 'spawn' multiprocessing, each worker gets a fresh Python
+    interpreter, avoiding PyTorch's threading conflicts with NiceGUI.
+
+    Args:
+        model_name: Name of the SentenceTransformer model to load
+    """
+    global _worker_model
+    from sentence_transformers import SentenceTransformer
+    import os
+
+    # Set single-threaded mode for PyTorch in worker process
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+
+    _worker_model = SentenceTransformer(model_name)
+
+
+def _compute_embeddings_in_worker(triplet_data: Dict, clustering_method: str) -> Dict:
+    """
+    Compute embeddings and distributions for a single triplet in worker process.
+
+    This function runs in an isolated worker process, using the pre-loaded
+    embedding model from _init_embedding_worker. It calls the existing
+    compute_triplet_distributions function from sdm_package.
+
+    Args:
+        triplet_data: Dictionary with 'question', 'context', 'answer', 'prompt_id'
+        clustering_method: Clustering method to use
+
+    Returns:
+        Dictionary with distributions and prompt_id
+    """
+    global _worker_model
+    from sdm_package.text_utils import compute_triplet_distributions
+
+    # Compute distributions using existing SDM infrastructure
+    dist_result = compute_triplet_distributions(
+        question=triplet_data['question'],
+        context=triplet_data['context'],
+        answer=triplet_data['answer'],
+        embedding_model=_worker_model,
+        clustering_method=clustering_method
+    )
+
+    # Add prompt_id to result
+    dist_result['prompt_id'] = triplet_data.get('prompt_id', 'unknown')
+
+    return dist_result
+
+
 class SemanticFaithfulnessPipeline:
     """End-to-end pipeline for semantic faithfulness analysis"""
 
@@ -41,6 +100,10 @@ class SemanticFaithfulnessPipeline:
         if cache_dir is None:
             cache_dir = self.output_dir.parent / 'cache'
         self.cache = CacheManager(cache_dir)
+
+        # Initialize ProcessPoolExecutor for embedding computation (created on-demand)
+        # Using spawn method (set in app.py) to avoid PyTorch threading conflicts
+        self.embedding_executor = None
 
     async def _update_progress(self, step: str, current: int, total: int, message: str = ""):
         """Update progress if callback is set"""
@@ -296,43 +359,45 @@ class SemanticFaithfulnessPipeline:
             await self._update_progress("Computing embeddings", 3, 5,
                                        f"Found {cache_stats['distributions_cached']} cached, {len(uncached_triplets)} to compute")
 
-            # Batch process all uncached triplets in ONE subprocess call (loads model once)
+            # Process uncached triplets using ProcessPoolExecutor
+            # This avoids PyTorch threading conflicts by using spawn-based multiprocessing
             if uncached_triplets:
-                await self._update_progress("Computing embeddings", 3, 5,
-                                           f"Loading embedding model and processing {len(uncached_triplets)} triplets...")
+                from concurrent.futures import ProcessPoolExecutor
 
-                def run_embedding_worker_batch():
-                    import subprocess
-                    import sys
+                # Create executor if not already initialized
+                if self.embedding_executor is None:
+                    await self._update_progress("Loading model", 3, 5,
+                                               f"Initializing worker process with {embedding_model} model...")
 
-                    worker_script = Path(__file__).parent / 'embedding_worker.py'
-                    input_data = {
-                        'triplets': uncached_triplets,  # Batch of all uncached triplets
-                        'embedding_model': embedding_model,
-                        'clustering_method': clustering_method
-                    }
-
-                    # Run subprocess (model loaded ONCE for all triplets)
-                    result = subprocess.run(
-                        [sys.executable, str(worker_script)],
-                        input=json.dumps(input_data),
-                        capture_output=True,
-                        text=True,
-                        timeout=1200  # 20 minute timeout (Qwen3 model is large and needs time to load)
+                    # Create executor with spawn method (set in app.py)
+                    # Single worker is sufficient and avoids resource contention
+                    self.embedding_executor = ProcessPoolExecutor(
+                        max_workers=1,
+                        initializer=_init_embedding_worker,
+                        initargs=(embedding_model,)
                     )
 
-                    if result.returncode != 0:
-                        raise RuntimeError(f"Embedding worker failed: {result.stderr}")
+                await self._update_progress("Computing embeddings", 3, 5,
+                                           f"Model loaded in worker. Processing {len(uncached_triplets)} triplets...")
 
-                    # Parse result
-                    output_data = json.loads(result.stdout)
-                    if not output_data['success']:
-                        raise RuntimeError(f"Embedding worker error: {output_data.get('error', 'Unknown error')}")
+                # Get event loop for executor calls
+                loop = asyncio.get_event_loop()
 
-                    return output_data['results']  # Returns list of all results
+                # Process each uncached triplet in isolated worker process
+                computed_distributions = []
+                for i, triplet_data in enumerate(uncached_triplets):
+                    await self._update_progress("Computing embeddings", 3, 5,
+                                               f"Processing triplet {i+1}/{len(uncached_triplets)}...")
 
-                # Run in thread to avoid blocking async loop
-                computed_distributions = await asyncio.to_thread(run_embedding_worker_batch)
+                    # Run computation in worker process (isolated from asyncio event loop)
+                    dist_result = await loop.run_in_executor(
+                        self.embedding_executor,
+                        _compute_embeddings_in_worker,
+                        triplet_data,
+                        clustering_method
+                    )
+
+                    computed_distributions.append(dist_result)
 
                 # Insert computed distributions back into the list and save to cache
                 for idx, dist_data in zip(uncached_indices, computed_distributions):

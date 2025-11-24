@@ -161,6 +161,22 @@ def create():
 
                     ui.separator().classes('my-4')
 
+                    # Embedding Model Selection (moved from Advanced Config for better visibility)
+                    ui.label('Embedding Model').classes('text-subtitle2 font-bold mb-2')
+                    form_data['embedding_model'] = ui.select(
+                        options={
+                            'sentence-transformers/all-mpnet-base-v2': 'MPNet Base v2 (Default - Fast & Accurate)',
+                            'sentence-transformers/all-MiniLM-L6-v2': 'MiniLM L6 v2 (Fastest, Lower Quality)',
+                            'sentence-transformers/paraphrase-multilingual-mpnet-base-v2': 'Multilingual MPNet (Multi-language Support)',
+                            'BAAI/bge-large-en-v1.5': 'BGE Large EN v1.5 (High Quality, Slower)',
+                            'Qwen/Qwen3-Embedding-0.6B': 'Qwen3 0.6B (High Quality - May hang in subprocess)'
+                        },
+                        value='sentence-transformers/all-mpnet-base-v2'
+                    ).classes('w-full')
+                    ui.label('Model affects embedding quality and speed. MPNet (default) loads in ~5-10 seconds with good quality. Note: Qwen3 may not work in subprocess environment.').classes('text-caption text-grey-6')
+
+                    ui.separator().classes('my-4')
+
                     # Original Question
                     ui.label('Original Question').classes('text-subtitle2 font-bold mb-2')
 
@@ -182,10 +198,10 @@ def create():
                             ).classes('flex-1').props('dense outlined').style('font-size: 0.875rem')
 
                             def load_from_history(e):
-                                # NiceGUI dropdown passes value directly in e.args if available
-                                value = e.args if hasattr(e, 'args') and e.args else None
-                                if value:
-                                    form_data['llm_question'].value = value
+                                # Use recent_select.value directly instead of event args
+                                selected_question = recent_select.value
+                                if selected_question:
+                                    form_data['llm_question'].value = selected_question
                                     recent_select.value = None  # Reset dropdown
 
                             recent_select.on('update:model-value', load_from_history)
@@ -305,7 +321,7 @@ def create():
                                 ui.label('1. Generate N paraphrases of your question').classes('text-body2')
                                 ui.label('2. Generate answers for each paraphrase').classes('text-body2')
                                 ui.label('3. Compute embeddings and cluster').classes('text-body2')
-                                ui.label('4. Compute semantic faithfulness (F_S)').classes('text-body2')
+                                ui.label('4. Compute semantic faithfulness F_S').classes('text-body2')
                                 ui.label('Estimated time: 3-5 minutes for 3 paraphrases').classes('text-caption text-grey-7 mt-2')
 
                     # Generate & Analyze button
@@ -385,18 +401,6 @@ def create():
         with ui.expansion('Advanced Configuration', icon='settings').classes('w-full mt-6'):
             with ui.card().classes('w-full p-6'):
                 with ui.row().classes('w-full gap-4'):
-                    # Embedding model selector
-                    with ui.column().classes('flex-1'):
-                        ui.label('Embedding Model').classes('text-subtitle2 font-bold mb-2')
-                        form_data['embedding_model'] = ui.select(
-                            options=[
-                                'Qwen/Qwen3-Embedding-0.6B',
-                                'sentence-transformers/all-MiniLM-L6-v2',
-                                'sentence-transformers/all-mpnet-base-v2'
-                            ],
-                            value='Qwen/Qwen3-Embedding-0.6B'
-                        ).classes('w-full')
-
                     # Clustering method
                     with ui.column().classes('flex-1'):
                         ui.label('Clustering Method').classes('text-subtitle2 font-bold mb-2')
@@ -404,6 +408,7 @@ def create():
                             options=['udib', 'kmeans', 'agglomerative'],
                             value='udib'
                         ).classes('w-full')
+                        ui.label('Algorithm for clustering embeddings into semantic concepts').classes('text-caption text-grey-6')
 
                 # Optimization parameters
                 with ui.row().classes('w-full gap-4 mt-4'):
@@ -566,8 +571,9 @@ async def start_llm_pipeline(form_data):
     app.storage.user['llm_last_num_paraphrases'] = num_paraphrases
 
     current_question = (form_data['llm_question'].value or '').strip()
-    app.storage.user['llm_last_question'] = current_question
-    app.storage.user['llm_last_context_source'] = form_data['context_source'].value
+    # DISABLED: Don't save to session to prevent auto-trigger on page load
+    # app.storage.user['llm_last_question'] = current_question
+    # app.storage.user['llm_last_context_source'] = form_data['context_source'].value
     if form_data['context_source'].value == 'url':
         app.storage.user['llm_last_url'] = (form_data['context_url'].value or '').strip()
 

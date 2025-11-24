@@ -8,40 +8,65 @@ def create():
     """Create the home page content"""
     with ui.column().classes('w-full max-w-4xl mx-auto p-8'):
         # Welcome header
-        ui.label('Semantic Faithfulness Analyzer').classes('text-h3 font-bold mb-4')
-        ui.label('Information-Theoretic Metrics for LLM Evaluation').classes('text-h6 text-grey-7 mb-8')
+        ui.label('Paraphrase Me').classes('text-h3 font-bold mb-4')
+        ui.label('LLM Semantic Assistant - Information-Theoretic Evaluation').classes('text-h6 text-grey-7 mb-8')
+
+        # What is this tool card
+        with ui.card().classes('w-full p-6 mb-6 bg-blue-50'):
+            ui.label('What Does This Tool Do?').classes('text-h5 mb-4')
+            ui.label(
+                'Paraphrase Me helps you evaluate whether an LLM faithfully paraphrases information from source context. '
+                'When you ask a question about a document and the LLM generates an answer, this tool measures how semantically '
+                'faithful that answer is to the original context using information-theoretic metrics.'
+            ).classes('mb-4')
+            ui.label(
+                'The core metric, Semantic Faithfulness F_S, reveals whether the LLM simply copied information or '
+                'genuinely understood and paraphrased it. High F_S scores indicate the answer aligns with an optimal '
+                'information channel between question, context, and answer.'
+            ).classes('mb-4')
 
         # Overview card
         with ui.card().classes('w-full p-6 mb-6'):
-            ui.label('Overview').classes('text-h5 mb-4')
-            ui.label(
-                'This application provides tools to evaluate the faithfulness of Large Language Model (LLM) '
-                'responses to provided context using information-theoretic metrics.'
-            ).classes('mb-4')
+            ui.label('Key Features').classes('text-h5 mb-4')
 
             with ui.column().classes('gap-2'):
-                ui.label('Key Features:').classes('font-bold')
-                ui.label('• Semantic Faithfulness (F_S): Measures alignment with optimal information channel')
+                ui.label('• Semantic Faithfulness F_S: Measures alignment with optimal information channel')
                 ui.label('• Semantic Entropy Production (SEP): Quantifies irreversibility in answer generation')
                 ui.label('• Topic Discovery: Automatic semantic topic identification via UDIB clustering')
                 ui.label('• Interactive Visualizations: Explore distributions, matrices, and metrics')
 
+        # Method explanation card
+        with ui.card().classes('w-full p-6 mb-6 bg-green-50'):
+            ui.label('How It Works').classes('text-h5 mb-4')
+            ui.label(
+                'The method embeds your Question, Context, and Answer into a semantic space, then discovers latent topics '
+                'using UDIB clustering. It computes probability distributions over these topics and measures how well '
+                'the joint distribution P(Q,C,A) can be compressed into an optimal channel P(Q)→P(C|Q)→P(A|C).'
+            ).classes('mb-2')
+            ui.label(
+                'A high F_S score means the answer is informationally consistent with the context given the question, '
+                'indicating faithful paraphrasing. A low F_S score suggests the LLM may have hallucinated or ignored context.'
+            ).classes('mb-2')
+
         # Quick start guide
         with ui.card().classes('w-full p-6 mb-6'):
-            ui.label('Quick Start').classes('text-h5 mb-4')
+            ui.label('Quick Start Guide').classes('text-h5 mb-4')
             with ui.stepper().props('vertical').classes('w-full') as stepper:
                 with ui.step('Input'):
-                    ui.label('Enter or upload your Question-Context-Answer triplet')
+                    ui.label('Enter or paste your Question, Context, and Answer. You can also provide a URL as context.')
                     ui.button('Go to Input', on_click=lambda: ui.navigate.to('/input')).props('outline')
 
                 with ui.step('Configure'):
-                    ui.label('Adjust analysis parameters (optional)')
+                    ui.label('Choose embedding model and adjust clustering parameters (optional - defaults work well)')
 
                 with ui.step('Analyze'):
-                    ui.label('Run the semantic faithfulness analysis')
+                    ui.label('Click "Start Analysis" to run semantic embedding, clustering, and metric computation')
 
                 with ui.step('Results'):
-                    ui.label('View metrics and visualizations')
+                    ui.label('View F_S metric, visualizations, and detailed topic distributions')
+
+                with ui.step('Compare'):
+                    ui.label('Optionally compare multiple Q-C-A triplets side-by-side')
 
         # Action buttons
         with ui.row().classes('gap-4 mt-8'):

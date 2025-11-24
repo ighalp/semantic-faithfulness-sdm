@@ -3,7 +3,20 @@ Semantic Faithfulness GUI Application
 Main entry point for the browser-based interface
 """
 
+# CRITICAL: Set multiprocessing start method to 'spawn' BEFORE any other imports
+# This fixes PyTorch threading issues on macOS by avoiding fork()-based multiprocessing
+# which corrupts PyTorch's internal thread pools
+import multiprocessing as mp
 import sys
+
+# Only set start method if running as main process (not in spawned worker)
+if __name__ in {"__main__", "__mp_main__"}:
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        # Start method already set (e.g., in tests or reloads)
+        pass
+
 from pathlib import Path
 
 # Load environment variables from .env files
@@ -19,66 +32,30 @@ load_dotenv(Path(__file__).parent.parent.parent / '.env')
 # Add parent directory to path to import sdm_package
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-print("="*70)
-print("PRE-LOADING MODULES FOR CACHE MODE")
-print("="*70)
-print("Loading only modules needed for cached analysis...")
-sys.stdout.flush()
+# Set environment variables to optimize PyTorch performance (macOS compatibility)
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-# For cache mode, we only need:
-# - numpy, scipy (for probability distributions and entropy)
-# - compute_semantic_faithfulness (for optimization)
-# - matplotlib (for plotting)
-# - NiceGUI (web framework)
-
-print("\n[1/4] Importing numpy and scipy...")
-sys.stdout.flush()
-import numpy as np
-from scipy.stats import entropy
-import json
-print("      ✓ Core libraries imported")
-sys.stdout.flush()
-
-print("[2/4] Importing compute_semantic_faithfulness (optimization only)...")
-sys.stdout.flush()
-# Import the function directly without loading sdm_package/__init__.py
-# This avoids triggering imports of SDM.py which has heavy dependencies
-import importlib.util
-spec = importlib.util.spec_from_file_location(
-    "compute_semantic_faithfulness_module",
-    str(Path(__file__).parent.parent / "sdm_package" / "compute_semantic_faithfulness.py")
-)
-csf_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(csf_module)
-compute_semantic_faithfulness = csf_module.compute_semantic_faithfulness
-print("      ✓ Optimization function imported (bypassing package __init__.py)")
-sys.stdout.flush()
-
-print("[3/4] Importing matplotlib...")
-sys.stdout.flush()
-import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for server-side
-import matplotlib.pyplot as plt
-print("      ✓ Plotting library imported")
-sys.stdout.flush()
-
-print("[4/4] Importing NiceGUI framework...")
-sys.stdout.flush()
+# Import NiceGUI framework
 from nicegui import ui, app
-print("      ✓ Web framework imported")
-sys.stdout.flush()
 
-print("\n" + "="*70)
-print("CACHE MODE STARTUP COMPLETE")
 print("="*70)
-print("Note: PyTorch/transformers NOT loaded (cache mode uses pre-computed data)")
-print("Starting web server...\n")
+print("PARAPHRASE ME - LLM SEMANTIC ASSISTANT")
+print("="*70)
+print("Starting web server on http://localhost:8080")
+print("\nEmbedding models will be loaded on-demand during analysis.")
+print("First analysis with Qwen3 takes ~30 seconds, subsequent runs use cache.\n")
 sys.stdout.flush()
 
-# Pages imported lazily in route functions (lightweight imports only)
+# Pages imported lazily in route functions
 
 # Application configuration
-APP_TITLE = "Semantic Faithfulness Analyzer"
+APP_TITLE = "Paraphrase Me - LLM Semantic Assistant"
 APP_PORT = 8080
 STORAGE_SECRET = "semantic-faithfulness-secret-key-2024"  # For session management
 
