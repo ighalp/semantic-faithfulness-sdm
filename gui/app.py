@@ -71,6 +71,7 @@ STORAGE_SECRET = "semantic-faithfulness-secret-key-2024"  # For session manageme
 APPLE_STYLE_CSS = """
 <style>
 /* Import system fonts similar to SF Pro */
+/* Light theme (default) */
 :root {
     --apple-bg: #fbfbfd;
     --apple-bg-secondary: #f5f5f7;
@@ -85,6 +86,112 @@ APPLE_STYLE_CSS = """
     --apple-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
     --apple-radius: 12px;
     --apple-radius-sm: 8px;
+}
+
+/* Dark theme */
+body.body--dark {
+    --apple-bg: #1d1d1f;
+    --apple-bg-secondary: #2d2d2f;
+    --apple-text: #f5f5f7;
+    --apple-text-secondary: #a1a1a6;
+    --apple-blue: #2997ff;
+    --apple-blue-hover: #40a9ff;
+    --apple-border: #424245;
+    --apple-card-bg: #2d2d2f;
+    --apple-nav-bg: rgba(29, 29, 31, 0.8);
+    --apple-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --apple-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+body.body--dark {
+    background-color: var(--apple-bg) !important;
+    color: var(--apple-text) !important;
+}
+
+body.body--dark .q-header {
+    background: var(--apple-nav-bg) !important;
+    border-bottom-color: var(--apple-border) !important;
+}
+
+body.body--dark .q-card {
+    background: var(--apple-card-bg) !important;
+    border-color: var(--apple-border) !important;
+}
+
+body.body--dark .text-h4,
+body.body--dark .text-h5,
+body.body--dark .text-h6,
+body.body--dark .q-header .text-h5 {
+    color: var(--apple-text) !important;
+}
+
+body.body--dark .q-header a {
+    color: var(--apple-text) !important;
+}
+
+body.body--dark .text-subtitle1,
+body.body--dark .text-subtitle2,
+body.body--dark .text-caption {
+    color: var(--apple-text-secondary) !important;
+}
+
+body.body--dark .bg-blue-50,
+body.body--dark .bg-blue-100 {
+    background: #1a3a5c !important;
+}
+
+body.body--dark .bg-green-50 {
+    background: #1a3d2e !important;
+}
+
+body.body--dark .bg-yellow-50 {
+    background: #3d3a1a !important;
+}
+
+body.body--dark .bg-amber-50 {
+    background: #3d351a !important;
+}
+
+body.body--dark .bg-purple-50 {
+    background: #2d1a3d !important;
+}
+
+body.body--dark .bg-grey-1,
+body.body--dark .bg-grey-50 {
+    background: var(--apple-bg-secondary) !important;
+}
+
+body.body--dark .q-field--outlined .q-field__control:before {
+    border-color: var(--apple-border) !important;
+}
+
+body.body--dark .q-select .q-field__native,
+body.body--dark .q-input .q-field__native {
+    color: var(--apple-text) !important;
+}
+
+body.body--dark .q-separator {
+    background: var(--apple-border) !important;
+}
+
+body.body--dark .q-tab {
+    color: var(--apple-text-secondary) !important;
+}
+
+body.body--dark .q-stepper__dot {
+    background: var(--apple-border) !important;
+}
+
+body.body--dark .q-stepper__tab--active .q-stepper__dot {
+    background: var(--apple-blue) !important;
+}
+
+body.body--dark ::-webkit-scrollbar-thumb {
+    background: var(--apple-border);
+}
+
+body.body--dark ::-webkit-scrollbar-thumb:hover {
+    background: var(--apple-text-secondary);
 }
 
 /* Global font and background */
@@ -351,15 +458,38 @@ def create_navbar():
     # Inject Apple CSS on first page load
     ui.add_head_html(APPLE_STYLE_CSS)
 
+    # Initialize dark mode from user storage (persists across sessions)
+    dark_mode = ui.dark_mode()
+
+    # Restore user's theme preference
+    stored_dark = app.storage.user.get('dark_mode', False)
+    if stored_dark:
+        dark_mode.enable()
+
     with ui.header().classes('items-center justify-between px-8'):
         ui.label(APP_TITLE).classes('text-h5 font-bold')
-        with ui.row().classes('gap-6'):
+        with ui.row().classes('gap-6 items-center'):
             ui.link('Home', '/').classes('no-underline')
             ui.link('Input', '/input').classes('no-underline')
             ui.link('Analyze', '/analyze').classes('no-underline')
             ui.link('Results', '/results').classes('no-underline')
             ui.link('Compare', '/compare').classes('no-underline')
             ui.link('LLM Judge', '/judge').classes('no-underline')
+
+            # Theme toggle with sun/moon icons
+            with ui.row().classes('items-center gap-1 ml-4'):
+                ui.icon('light_mode', size='sm').classes('text-amber-500')
+
+                def toggle_theme(e):
+                    if e.value:
+                        dark_mode.enable()
+                    else:
+                        dark_mode.disable()
+                    # Persist preference
+                    app.storage.user['dark_mode'] = e.value
+
+                ui.switch(value=stored_dark, on_change=toggle_theme).props('dense color=grey-8')
+                ui.icon('dark_mode', size='sm').classes('text-blue-300')
 
 # Route definitions
 @ui.page('/')
