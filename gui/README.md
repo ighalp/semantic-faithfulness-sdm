@@ -183,11 +183,45 @@ Measures irreversibility in the answer generation process.
 
 ## Technical Details
 
-### Architecture
-- **Frontend**: NiceGUI (Vue.js + Quasar)
-- **Backend**: FastAPI (built into NiceGUI)
-- **Visualization**: Plotly
-- **Styling**: Apple-inspired design with CSS custom properties
+### Frontend: NiceGUI
+
+[NiceGUI](https://nicegui.io/) is a Python-based web UI framework that allows building interactive web applications entirely in Python. Key characteristics:
+
+- **Pure Python**: No JavaScript, HTML, or CSS required (though customization is supported)
+- **Built on Vue.js + Quasar**: Under the hood, NiceGUI uses Vue.js for reactivity and Quasar for UI components, providing a rich set of Material Design widgets
+- **Auto-refresh**: UI updates automatically when Python state changes
+- **Async support**: Native support for async/await, enabling non-blocking LLM API calls
+
+This application uses NiceGUI's component library for forms, cards, buttons, tabs, and interactive elements, styled with custom CSS for an Apple-inspired look.
+
+### Backend: FastAPI
+
+NiceGUI includes FastAPI as its built-in web server, providing:
+
+- **High performance**: Async request handling with uvicorn
+- **Session management**: User state persistence via `app.storage.user`
+- **WebSocket communication**: Real-time UI updates between browser and server
+- **Static file serving**: Automatic handling of CSS, JavaScript, and assets
+
+The backend orchestrates:
+- LLM API calls (OpenAI, Anthropic, Google Gemini) for paraphrase/answer generation
+- SDM analysis engine for computing semantic faithfulness metrics
+- Caching of embeddings, distributions, and LLM responses
+
+### Visualization: Plotly
+
+Interactive charts are rendered using [Plotly](https://plotly.com/python/), including:
+- Probability distribution bar charts
+- Transition matrix heatmaps
+- F_S score comparisons across paraphrases
+
+### Styling
+
+Apple-inspired design implemented with CSS custom properties:
+- Clean typography using system fonts (SF Pro-like)
+- Subtle shadows and rounded corners
+- Light/dark theme toggle with smooth transitions
+- Frosted glass effect on navigation bar
 
 ### Processing Pipeline
 1. **Tokenization**: Split text into sentences using NLTK
