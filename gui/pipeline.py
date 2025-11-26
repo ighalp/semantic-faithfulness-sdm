@@ -414,7 +414,8 @@ class SemanticFaithfulnessPipeline:
                         {
                             'p_q': dist_data['p_q'],
                             'p_c': dist_data['p_c'],
-                            'p_a': dist_data['p_a']
+                            'p_a': dist_data['p_a'],
+                            'n_topics': dist_data['n_topics']
                         }
                     )
                 cache_stats['distributions_computed'] = len(uncached_triplets)

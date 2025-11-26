@@ -11,20 +11,22 @@ import json
 def create():
     """Create the results page content"""
 
-    # Check if we have results (manual analysis or LLM pipeline)
-    results = app.storage.user.get('analysis_results')
-    llm_results = app.storage.user.get('llm_pipeline_results')
+    # Get analysis results (set by analyze page after optimization completes)
+    try:
+        results = app.storage.user.get('analysis_results')
+    except Exception:
+        results = None
 
-    if not results and not llm_results:
+    # Validate that all required keys are present
+    required_keys = ['F_S', 'SEP_total', 'SEP_system', 'H_Q', 'H_C', 'H_A', 'p_q', 'p_c', 'p_a', 'n_clusters']
+    if not results or not isinstance(results, dict) or not all(k in results and results[k] is not None for k in required_keys):
         with ui.column().classes('w-full max-w-6xl mx-auto p-8'):
             ui.label('No Results Available').classes('text-h4 mb-6')
-            ui.label('Please run an analysis first.').classes('text-subtitle1 text-grey-7 mb-4')
-            ui.button('Go to Input', on_click=lambda: ui.navigate.to('/input')).props('color=primary')
+            ui.label('Please run an analysis first from the Analyze page.').classes('text-subtitle1 text-grey-7 mb-4')
+            ui.button('Go to Analyze', on_click=lambda: ui.navigate.to('/analyze')).props('color=primary')
         return
 
-    # Use LLM results if available, otherwise use manual analysis results
-    display_results = llm_results if llm_results else results
-    is_llm_results = llm_results is not None
+    display_results = results
 
     with ui.column().classes('w-full max-w-6xl mx-auto p-8'):
         ui.label('Analysis Results').classes('text-h4 mb-6')
@@ -65,8 +67,8 @@ def create():
                 ui.label('H(A)').classes('text-subtitle2')
                 ui.label(f"{display_results['H_A']:.4f} bits").classes('text-h5')
 
-        # Cache Statistics (only for LLM pipeline results)
-        if is_llm_results and 'cache_stats' in display_results:
+        # Cache Statistics (only if available)
+        if 'cache_stats' in display_results:
             cache_stats = display_results['cache_stats']
             ui.label('Cache Statistics').classes('text-h6 mb-4 mt-6')
             with ui.card().classes('w-full p-6'):

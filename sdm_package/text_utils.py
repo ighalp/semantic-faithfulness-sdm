@@ -115,6 +115,13 @@ def compute_triplet_distributions(
     dib_analyzer.run(tau_values, max_n_clusters=max_n_clusters, seed=seed)
     recommendation, _ = dib_analyzer.get_recommendation(min_clusters=min_clusters, metric='kink_angle')
 
+    if recommendation is None:
+        raise ValueError(
+            f"DIB clustering failed to find stable solutions. "
+            f"This can happen when there are too few sentences ({len(all_sentences)} total). "
+            f"Try providing longer context or answer text."
+        )
+
     assignments = recommendation['assignments']
     n_topics = recommendation['n_clusters']
 

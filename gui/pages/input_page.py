@@ -165,15 +165,15 @@ def create():
                     ui.label('Embedding Model').classes('text-subtitle2 font-bold mb-2')
                     form_data['embedding_model'] = ui.select(
                         options={
-                            'sentence-transformers/all-mpnet-base-v2': 'MPNet Base v2 (Default - Fast & Accurate)',
+                            'Qwen/Qwen3-Embedding-0.6B': 'Qwen3 0.6B (Default - High Quality)',
+                            'sentence-transformers/all-mpnet-base-v2': 'MPNet Base v2 (Fast & Accurate)',
                             'sentence-transformers/all-MiniLM-L6-v2': 'MiniLM L6 v2 (Fastest, Lower Quality)',
                             'sentence-transformers/paraphrase-multilingual-mpnet-base-v2': 'Multilingual MPNet (Multi-language Support)',
                             'BAAI/bge-large-en-v1.5': 'BGE Large EN v1.5 (High Quality, Slower)',
-                            'Qwen/Qwen3-Embedding-0.6B': 'Qwen3 0.6B (High Quality - May hang in subprocess)'
                         },
-                        value='sentence-transformers/all-mpnet-base-v2'
+                        value='Qwen/Qwen3-Embedding-0.6B'
                     ).classes('w-full')
-                    ui.label('Model affects embedding quality and speed. MPNet (default) loads in ~5-10 seconds with good quality. Note: Qwen3 may not work in subprocess environment.').classes('text-caption text-grey-6')
+                    ui.label('Model affects embedding quality and speed. Qwen3 (default) provides high quality embeddings. First load takes ~30 seconds.').classes('text-caption text-grey-6')
 
                     ui.separator().classes('my-4')
 
@@ -781,6 +781,8 @@ async def start_llm_pipeline(form_data):
         # Store results in session
         app.storage.user['llm_pipeline_results'] = results
         app.storage.user['analysis_status'] = 'llm_complete'
+        # Clear previous analysis results to avoid stale data on results page
+        app.storage.user['analysis_results'] = None
 
         # Store first triplet for analysis
         if results.get('triplets'):

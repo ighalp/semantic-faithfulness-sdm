@@ -265,10 +265,22 @@ class DIBAnalyzer:
         
         num_solutions = len(rep_solutions_list)
         if num_solutions < (2 * window_size + 1):
-            print(f"Warning: Not enough stable solutions ({num_solutions}) to calculate kinks with window size {window_size}. "
-                  "Try a smaller window_size or a denser tau sweep.")
-            # Fallback to empty list
-            self._stable_solutions = []
+            print(f"Note: Not enough stable solutions ({num_solutions}) for kink detection. "
+                  "Returning all found cluster solutions.")
+            # Return all solutions with kink_angle=0 (skip kink detection)
+            stable_solutions = []
+            for sol in rep_solutions_list:
+                nc = sol['n_clusters']
+                tau_min, tau_max = tau_ranges_for_nc[nc]
+                stable_solutions.append({
+                    'n_clusters': nc,
+                    'kink_angle': 0.0,
+                    'assignments': sol['assignments'],
+                    'H(c)': sol['H(c)'],
+                    'tau_min': tau_min,
+                    'tau_max': tau_max,
+                })
+            self._stable_solutions = stable_solutions
             self._cache_params = {'window_size': window_size}
             return self._stable_solutions
 

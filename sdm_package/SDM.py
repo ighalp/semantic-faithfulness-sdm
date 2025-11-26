@@ -44,7 +44,7 @@ import seaborn as sns
 from scipy.spatial.distance import cdist
 import ot
 
-from DIB_with_KL_upper_bound import DIBAnalyzer
+from .DIB_with_KL_upper_bound import DIBAnalyzer
 
 class SemanticFaithfulnessAnalyzer:
     """

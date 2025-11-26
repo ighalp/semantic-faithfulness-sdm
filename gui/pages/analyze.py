@@ -95,8 +95,9 @@ async def run_cached_analysis(state, cached_dist):
     state['log_area'].push('║         CACHED ANALYSIS MODE - FAST EXECUTION         ║')
     state['log_area'].push('╚═══════════════════════════════════════════════════════╝')
     state['log_area'].push('')
-    state['log_area'].push(f'Cached Triplet ID: {cached_dist["prompt_id"]}')
-    state['log_area'].push(f'Number of Clusters: {cached_dist["k"]}')
+    state['log_area'].push(f'Cached Triplet ID: {cached_dist.get("prompt_id", "unknown")}')
+    n_clusters_display = cached_dist.get('k') or cached_dist.get('n_topics') or len(cached_dist.get('p_q', []))
+    state['log_area'].push(f'Number of Clusters: {n_clusters_display}')
     state['log_area'].push(f'Optimization Tolerance: {config_dict["tolerance"]}')
     state['log_area'].push(f'Max Iterations: {config_dict["max_iterations"]}')
     state['log_area'].push('')
@@ -131,7 +132,7 @@ async def run_cached_analysis(state, cached_dist):
         state['stage_chips']['clustering'].props('icon=hourglass_empty color=blue')
         await asyncio.sleep(0.1)
 
-        state['log_area'].push(f'   ✓ FOUND: Cached cluster assignments (k={cached_dist["k"]})')
+        state['log_area'].push(f'   ✓ FOUND: Cached cluster assignments (k={cached_dist.get("k") or cached_dist.get("n_topics") or len(cached_dist.get("p_q", []))})')
         state['log_area'].push('   ⊙ SKIPPING: UDIB clustering (using cache)')
         state['stage_chips']['clustering'].props('icon=check_circle color=green')
         state['progress_bar'].value = 0.3
@@ -145,7 +146,8 @@ async def run_cached_analysis(state, cached_dist):
         p_q = np.array(cached_dist['p_q'])
         p_c = np.array(cached_dist['p_c'])
         p_a = np.array(cached_dist['p_a'])
-        n_clusters = cached_dist['k']
+        # Get n_clusters from cache or derive from distribution length
+        n_clusters = cached_dist.get('k') or cached_dist.get('n_topics') or len(p_q)
 
         state['log_area'].push(f'   ✓ p_q (Question distribution): shape=({len(p_q)},)')
         state['log_area'].push(f'   ✓ p_c (Context distribution): shape=({len(p_c)},)')

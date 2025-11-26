@@ -229,6 +229,9 @@ class CacheManager:
             'distributions': distributions
         }
 
+        # Ensure parent directory exists (for model names with slashes like "Qwen/Qwen3-Embedding-0.6B")
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+
         with open(cache_file, 'w') as f:
             json.dump(data, f, indent=2)
 
