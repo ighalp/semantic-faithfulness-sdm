@@ -15,14 +15,20 @@ def create():
         with ui.card().classes('w-full p-6 mb-6 bg-blue-50'):
             ui.label('What Does This Tool Do?').classes('text-h5 mb-4')
             ui.label(
-                'Paraphrase Me helps you evaluate whether an LLM faithfully paraphrases information from source context. '
-                'When you ask a question about a document and the LLM generates an answer, this tool measures how semantically '
-                'faithful that answer is to the original context using information-theoretic metrics.'
+                'Paraphrase Me helps you evaluate faithfulness of LLM answer or answers to your questions and context '
+                'documents - in short, faithfulness of an LLM to its task. Our tool allows you to find answers to such '
+                'questions while operating with the LLM as a black box.'
             ).classes('mb-4')
             ui.label(
-                'The core metric, Semantic Faithfulness F_S, reveals whether the LLM simply copied information or '
-                'genuinely understood and paraphrased it. High F_S scores indicate the answer aligns with an optimal '
-                'information channel between question, context, and answer.'
+                'Our tool uses paraphrasings of the initial user question (prompt) in various semantically equivalent ways '
+                'to explore the amount of variability produced in answers by paraphrasing of questions. This tool uses '
+                'methods from information theory and physics to find the most faithful answer from the set of generated answers.'
+            ).classes('mb-4')
+            ui.label(
+                'The recommendation obtained by our method using our quantitative metrics called Semantic Faithfulness (F_S) '
+                'and Semantic Entropy Production (SEP) can then be validated qualitatively using the LLM-as-a-Judge technique, '
+                'or human evaluation. The tool can be used for tasks such as LLM summarizations as an automatic selector of '
+                'the best answer among a set of generated or externally provided multiple answers.'
             ).classes('mb-4')
 
         # Overview card
