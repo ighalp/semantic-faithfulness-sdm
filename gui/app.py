@@ -44,6 +44,17 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # Import NiceGUI framework
 from nicegui import ui, app
 
+# Import authentication module
+from auth import (
+    get_auth_manager,
+    register_auth_pages,
+    get_current_session,
+    create_user_menu,
+    require_auth,
+    inject_api_keys,
+    AuthContext,
+)
+
 print("="*70)
 print("PARAPHRASE ME - LLM SEMANTIC ASSISTANT")
 print("="*70)
@@ -57,7 +68,18 @@ sys.stdout.flush()
 # Application configuration
 APP_TITLE = "Paraphrase Me - LLM Semantic Assistant"
 APP_PORT = 8080
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080")
 STORAGE_SECRET = "semantic-faithfulness-secret-key-2024"  # For session management
+
+# Initialize authentication
+auth_manager = get_auth_manager()
+if auth_manager.is_enabled:
+    print(f"Authentication enabled: {auth_manager.provider_name}")
+    print("  ⚠️  WARNING: Auth module is EXPERIMENTAL and may require debugging.")
+    print("  ⚠️  This is only needed for enterprise SSO deployments.")
+else:
+    print("Authentication: disabled (open access)")
+sys.stdout.flush()
 
 # =============================================================================
 # APPLE-STYLE THEME
@@ -455,6 +477,8 @@ a:not(.q-btn):not(.q-tab):hover {
 # Main navigation bar component - Apple Style
 def create_navbar():
     """Create the main navigation bar - Apple style"""
+    import asyncio
+
     # Inject Apple CSS on first page load
     ui.add_head_html(APPLE_STYLE_CSS)
 
@@ -491,44 +515,101 @@ def create_navbar():
                 ui.switch(value=stored_dark, on_change=toggle_theme).props('dense color=grey-8')
                 ui.icon('dark_mode', size='sm').classes('text-blue-300')
 
-# Route definitions
+            # User menu (if auth enabled)
+            if auth_manager.is_enabled:
+                user_menu_container = ui.row().classes('items-center ml-4')
+
+                async def build_user_menu():
+                    session = await get_current_session()
+                    with user_menu_container:
+                        if session and session.user:
+                            user = session.user
+                            # User dropdown
+                            with ui.button(
+                                user.name or user.email.split("@")[0],
+                                icon='person'
+                            ).props('flat dense'):
+                                with ui.menu():
+                                    ui.menu_item(
+                                        f"Signed in as {user.email}",
+                                        auto_close=False
+                                    ).classes('text-caption')
+                                    ui.separator()
+                                    ui.menu_item(
+                                        "Log Out",
+                                        on_click=lambda: ui.navigate.to("/logout")
+                                    )
+                        else:
+                            ui.button(
+                                "Log In",
+                                icon='login',
+                                on_click=lambda: ui.navigate.to("/login")
+                            ).props('flat dense')
+
+                asyncio.create_task(build_user_menu())
+
+# =============================================================================
+# ROUTE DEFINITIONS
+# =============================================================================
+# When AUTH_PROVIDER is set (not 'disabled'), protected pages require login.
+# The home page is always public. Other pages are protected when auth is enabled.
+
 @ui.page('/')
 def index():
-    """Home page"""
+    """Home page (always public)"""
     create_navbar()
     from pages import home
     home.create()
 
+
+# Protected routes - require authentication when enabled
+# Note: The @require_auth decorator checks if auth is enabled and skips
+# validation if disabled, so these pages work in both modes.
+
 @ui.page('/input')
-def input_route():
+@require_auth(message="Please log in to access the Input page")
+@inject_api_keys()
+async def input_route():
     """Input page for QCA triplets"""
     create_navbar()
     from pages import input_page
     input_page.create()
 
+
 @ui.page('/analyze')
-def analyze_route():
+@require_auth(message="Please log in to access the Analyze page")
+@inject_api_keys()
+async def analyze_route():
     """Analysis execution page"""
     create_navbar()
     from pages import analyze
     analyze.create()
 
+
 @ui.page('/results')
-def results_route():
+@require_auth(message="Please log in to access the Results page")
+@inject_api_keys()
+async def results_route():
     """Results visualization page"""
     create_navbar()
     from pages import results
     results.create()
 
+
 @ui.page('/judge')
-def judge_route():
+@require_auth(message="Please log in to access the LLM Judge page")
+@inject_api_keys()
+async def judge_route():
     """LLM-as-a-Judge comparison page"""
     create_navbar()
     from pages import judge
     judge.create()
 
+
 @ui.page('/compare')
-def compare_route():
+@require_auth(message="Please log in to access the Compare page")
+@inject_api_keys()
+async def compare_route():
     """Multi-triplet comparison page"""
     create_navbar()
     from pages import compare
@@ -536,6 +617,10 @@ def compare_route():
 
 # Application startup
 if __name__ in {"__main__", "__mp_main__"}:
+    # Register authentication pages if auth is enabled
+    if auth_manager.is_enabled:
+        register_auth_pages(base_url=APP_BASE_URL)
+
     ui.run(
         title=APP_TITLE,
         port=APP_PORT,

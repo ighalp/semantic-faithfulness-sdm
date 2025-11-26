@@ -153,6 +153,87 @@ The application will:
 
 ## Configuration
 
+### Authentication (Enterprise) - EXPERIMENTAL
+
+> **⚠️ Development Status**: This authentication module is currently in development and has not been fully tested in production environments. It may require debugging and tuning when deployed. This feature is **only needed for enterprise deployments** that require corporate SSO integration. For personal or development use, leave authentication disabled (the default).
+
+For corporate environments requiring authentication, the application supports OAuth2/OIDC with multiple identity providers.
+
+#### Enable Authentication
+
+Set the following environment variables in your `.env` file:
+
+```bash
+# Enable authentication (options: disabled, okta, azure, pyauth)
+AUTH_PROVIDER=okta
+
+# Session configuration
+AUTH_SESSION_STORE=memory    # Options: memory, redis, oracle
+AUTH_SESSION_TIMEOUT_HOURS=9  # Default: 9 hours
+```
+
+#### Provider Configuration
+
+**Okta:**
+```bash
+AUTH_PROVIDER=okta
+OKTA_ISSUER_URL=https://your-org.okta.com/oauth2/default
+OKTA_CLIENT_ID=your-client-id
+OKTA_CLIENT_SECRET=your-client-secret
+OKTA_REDIRECT_URI=http://localhost:8080/auth/callback
+```
+
+**Azure AD:**
+```bash
+AUTH_PROVIDER=azure
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-client-id
+AZURE_CLIENT_SECRET=your-client-secret
+AZURE_REDIRECT_URI=http://localhost:8080/auth/callback
+```
+
+**PyAuth (Internal Corporate SSO):**
+```bash
+AUTH_PROVIDER=pyauth
+PYAUTH_CLIENT_ID=your-client-id
+PYAUTH_CLIENT_SECRET=your-client-secret
+PYAUTH_AUTHORIZATION_ENDPOINT=https://auth.corp.com/authorize
+PYAUTH_TOKEN_ENDPOINT=https://auth.corp.com/token
+PYAUTH_USERINFO_ENDPOINT=https://auth.corp.com/userinfo
+PYAUTH_REDIRECT_URI=http://localhost:8080/auth/callback
+# Optional: API keys endpoint for centralized key management
+PYAUTH_API_KEYS_ENDPOINT=https://api.corp.com/keys
+```
+
+#### Session Storage (Production)
+
+For production deployments with multiple instances:
+
+**Redis:**
+```bash
+AUTH_SESSION_STORE=redis
+AUTH_REDIS_URL=redis://localhost:6379/0
+```
+
+**Oracle:**
+```bash
+AUTH_SESSION_STORE=oracle
+AUTH_ORACLE_DSN=user/password@host:1521/service
+AUTH_ORACLE_TABLE=auth_sessions
+```
+
+See `gui/auth/session_store.py` for Oracle table schema.
+
+#### Protected Pages
+
+When authentication is enabled:
+- **Home page** (`/`): Always public
+- **Input, Analyze, Results, Compare, LLM Judge**: Require login
+
+API keys can be provided via:
+1. Environment variables (traditional)
+2. OAuth session (via API keys endpoint) - keys are injected automatically
+
 ### Embedding Models
 - `Qwen/Qwen3-Embedding-0.6B` (Default, high quality)
 - `sentence-transformers/all-MiniLM-L6-v2` (Lightweight, fast)
@@ -357,11 +438,20 @@ MIT License - See parent directory for details.
 
 ## Version
 
-Current version: 2.0.0
+Current version: 2.1.0
 
 ### Changelog
 
-**v2.0.0** (Current)
+**v2.1.0** (Current)
+- Added OAuth2/OIDC authentication module for enterprise deployments (EXPERIMENTAL - not yet tested in production)
+- Support for Okta, Azure AD, and custom PyAuth providers
+- Pluggable session storage (Memory, Redis, Oracle)
+- API keys injection from OAuth session
+- Light/dark theme toggle with persistence
+- Custom judge prompt editor for LLM-as-a-Judge
+- Judge model selection (independent of answer generation model)
+
+**v2.0.0**
 - Added LLM pipeline for paraphrase and answer generation
 - Added Compare page with diff highlighting
 - Added LLM-as-a-Judge evaluation
