@@ -1,6 +1,6 @@
 # Paraphrase Me - LLM Semantic Assistant
 
-A beautiful, Apple-inspired web application for analyzing semantic faithfulness of Large Language Model (LLM) responses using information-theoretic methods.
+A simple, Apple-inspired web application for analyzing semantic faithfulness of Large Language Model (LLM) responses using information-theoretic methods.
 
 ## Overview
 
