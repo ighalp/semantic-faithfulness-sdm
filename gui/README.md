@@ -39,7 +39,7 @@ A simple, Apple-inspired web application for analyzing semantic faithfulness of 
 │  │                                                                        │  │
 │  │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌───────────┐  │  │
 │  │  │ Tokenize    │──▶│  Embed      │──▶│  Cluster    │──▶│ Optimize  │  │  │
-│  │  │ (NLTK)      │   │ (Qwen3)     │   │ (UDIB)      │   │ (CT Algo) │  │  │
+│  │  │ (NLTK)      │   │ (Qwen3)     │   │ (UDIB)      │   │ (SF Algo) │  │  │
 │  │  └─────────────┘   └─────────────┘   └─────────────┘   └───────────┘  │  │
 │  │                                                                        │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
