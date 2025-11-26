@@ -7,7 +7,7 @@ A simple, Apple-inspired web application for analyzing semantic faithfulness of 
 **Paraphrase Me** is a complete pipeline for:
 1. Generating question paraphrases using LLMs (OpenAI, Anthropic, Google Gemini)
 2. Generating answers for each paraphrase
-3. Computing Semantic Faithfulness (F_S) scores
+3. Compute the Semantic Faithfulness (SF) and Semantic Entropy Production (SEP) scores
 4. Comparing answers side-by-side with diff highlighting
 5. Using LLM-as-a-Judge to evaluate answer quality
 6. Exporting results in Markdown or PDF format
