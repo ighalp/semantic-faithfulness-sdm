@@ -5,6 +5,8 @@
 
 A Python package implementing **novel metrics grounded in information theory and stochastic thermodynamics** for evaluating Large Language Model (LLM) faithfulness and semantic alignment with source contexts. These metrics are computable using lightweight algorithms requiring only sentence embeddings and standard convex optimization. The package provides the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic Entropy Production (SEP) metrics introduced in our paper.
 
+**Now with a beautiful web-based GUI application!** See the [GUI Documentation](gui/README.md) for details.
+
 ## 📖 Overview
 
 When LLMs generate answers based on provided context, how do we measure whether they faithfully represent the information in that context? Traditional metrics like BLEU or ROUGE measure surface-level similarity, while this package provides **information-theoretic measures** that capture semantic alignment at a deeper level.
@@ -16,6 +18,7 @@ When LLMs generate answers based on provided context, how do we measure whether 
 - **Upper-Bounded DIB (UDIB) Clustering**: Automated semantic topic discovery from text
 - **Black-box Evaluation**: Works with any LLM without requiring access to internal activations or logits
 - **Convex Optimization**: Guaranteed convergence to global optimum using Csiszár-Tusnády/Blahut-Arimoto Alternating Minimization algorithm
+- **Web-Based GUI**: Interactive browser application with LLM integration, paraphrase generation, answer comparison, and LLM-as-a-Judge evaluation
 
 ### Theoretical Foundation
 
@@ -60,6 +63,32 @@ The notebook is divided into two parts:
 2. **Part II**: Multi-triplet analysis with visualization suite (research)
 
 **Performance Note**: The notebook uses pre-computed cached distributions and does NOT regenerate embeddings. Full execution time for all 10 triplets is approximately 2-3 minutes, with most time spent on the Csiszár-Tusnády optimization algorithm (not embedding generation).
+
+### Web-Based GUI Application
+
+For an interactive experience, use our **Paraphrase Me** web application:
+
+```bash
+# Navigate to the GUI directory
+cd gui
+
+# Install GUI dependencies
+pip install -r requirements-gui.txt
+
+# Run the application
+python app.py
+```
+
+Open your browser to **http://localhost:8080** and enjoy:
+
+- **Input Page**: Enter your Question-Context-Answer triplet or use built-in examples
+- **LLM Pipeline**: Generate paraphrases and answers using OpenAI, Anthropic, or Google Gemini
+- **Analysis**: Compute F_S scores for all answer variants automatically
+- **Results**: Interactive visualizations with Plotly charts
+- **Compare**: Side-by-side answer comparison with diff highlighting
+- **LLM Judge**: Use LLM-as-a-Judge to evaluate which answer is best
+
+See the [GUI Documentation](gui/README.md) for complete details.
 
 ### Installation
 
@@ -161,29 +190,42 @@ Our experiments on NVIDIA 10-K financial disclosures show:
 
 ```
 semantic-faithfulness-sdm/
-├── sdm_package/                 # Core package
+├── sdm_package/                    # Core SDM package
 │   ├── __init__.py
-│   ├── SDM.py                   # Main SDM analyzer
-│   ├── DIB_with_KL_upper_bound.py  # UDIB clustering
+│   ├── SDM.py                      # Main SDM analyzer class
+│   ├── DIB_with_KL_upper_bound.py  # UDIB clustering algorithm
 │   └── compute_semantic_faithfulness.py  # F_S and SEP computation
-├── examples/                    # Usage examples
+├── gui/                            # Web-based GUI application
+│   ├── app.py                      # Main application entry point
+│   ├── requirements-gui.txt        # GUI-specific dependencies
+│   ├── README.md                   # GUI documentation
+│   ├── llm_client.py               # LLM API client (OpenAI, Anthropic, Gemini)
+│   ├── pages/                      # NiceGUI page modules
+│   │   ├── home.py                 # Landing page
+│   │   ├── input_page.py           # Input form with LLM pipeline
+│   │   ├── analyze.py              # Analysis execution
+│   │   ├── results.py              # Results visualization
+│   │   ├── compare.py              # Answer comparison
+│   │   ├── judge.py                # LLM-as-a-Judge evaluation
+│   │   └── markdown_utils.py       # Markdown to HTML conversion
+│   └── services/                   # Business logic
+│       └── analysis_service.py     # SDM pipeline wrapper
+├── examples/                       # Usage examples
 │   ├── basic_usage.py
-│   ├── nvidia_10k_analysis.py
 │   └── batch_evaluation.py
-├── tests/                       # Unit tests
+├── tests/                          # Unit tests
 │   ├── test_sdm.py
-│   ├── test_dib.py
 │   └── test_semantic_faithfulness.py
-├── docs/                        # Documentation
-│   ├── methodology.md
-│   ├── api_reference.md
-│   └── examples.md
-├── data/                        # Example data
-│   └── README.md
-├── requirements.txt
-├── setup.py
-├── README.md
-└── LICENSE
+├── docs/                           # Documentation
+│   └── methodology.md              # Theoretical foundations
+├── data/                           # Example data and cache
+│   ├── README.md
+│   └── cache/                      # Cached embeddings and distributions
+├── Semantic_Faithfulness_SDM_demo.ipynb  # Interactive demo notebook
+├── requirements.txt                # Core dependencies
+├── setup.py                        # Package installation
+├── README.md                       # This file
+└── LICENSE                         # MIT License
 ```
 
 ## 🔧 Requirements

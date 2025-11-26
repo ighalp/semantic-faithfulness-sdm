@@ -66,17 +66,59 @@ def create():
                     ui.label('View F_S metric, visualizations, and detailed topic distributions')
 
                 with ui.step('Compare'):
-                    ui.label('Optionally compare multiple Q-C-A triplets side-by-side')
+                    ui.label('Compare answer variants side-by-side (Initial vs Lowest F_S by default)')
+                    ui.button('Go to Compare', on_click=lambda: ui.navigate.to('/compare')).props('outline')
+
+                with ui.step('LLM Judge'):
+                    ui.label('Use LLM-as-a-Judge to evaluate and select the best answer, then export')
+                    ui.button('Go to LLM Judge', on_click=lambda: ui.navigate.to('/judge')).props('outline')
 
         # Action buttons
         with ui.row().classes('gap-4 mt-8'):
             ui.button('Start New Analysis', on_click=lambda: ui.navigate.to('/input')).props('color=primary size=lg')
-            ui.button('View Documentation', on_click=lambda: ui.notify('Documentation coming soon')).props('outline size=lg')
+            ui.link(
+                'View Documentation',
+                'https://github.com/ighalp/semantic-faithfulness-sdm/blob/main/gui/README.md',
+                new_tab=True
+            ).classes('q-btn q-btn--outline q-btn--rectangle text-primary q-btn--standard q-btn--size-lg no-underline')
+
+        # Documentation links card
+        with ui.card().classes('w-full p-6 mt-6 bg-purple-50'):
+            ui.label('Documentation & Resources').classes('text-h6 mb-4')
+            with ui.column().classes('gap-2'):
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon('description', color='purple')
+                    ui.link(
+                        'GUI Application Guide',
+                        'https://github.com/ighalp/semantic-faithfulness-sdm/blob/main/gui/README.md',
+                        new_tab=True
+                    ).classes('text-primary')
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon('architecture', color='purple')
+                    ui.link(
+                        'System Architecture',
+                        'https://github.com/ighalp/semantic-faithfulness-sdm/blob/main/docs/architecture.md',
+                        new_tab=True
+                    ).classes('text-primary')
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon('science', color='purple')
+                    ui.link(
+                        'Methodology & Theory',
+                        'https://github.com/ighalp/semantic-faithfulness-sdm/blob/main/docs/methodology.md',
+                        new_tab=True
+                    ).classes('text-primary')
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon('code', color='purple')
+                    ui.link(
+                        'API Reference & Examples',
+                        'https://github.com/ighalp/semantic-faithfulness-sdm/blob/main/README.md',
+                        new_tab=True
+                    ).classes('text-primary')
 
         # Footer info
         ui.separator().classes('my-8')
         with ui.row().classes('justify-center gap-8 text-grey-6'):
-            ui.label('Version 1.0.0')
+            ui.label('Version 2.0.0')
             ui.label('•')
             ui.label('Python 3.10+')
             ui.label('•')

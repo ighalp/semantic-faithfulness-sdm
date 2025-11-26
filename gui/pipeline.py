@@ -31,12 +31,22 @@ def _init_embedding_worker(model_name: str):
     global _worker_model
     from sentence_transformers import SentenceTransformer
     import os
+    import torch
 
     # Set single-threaded mode for PyTorch in worker process
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_NUM_THREADS'] = '1'
 
-    _worker_model = SentenceTransformer(model_name)
+    # Clear any existing GPU memory before loading model
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    elif torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # Load model - use CPU if MPS has memory issues
+    # You can set FORCE_CPU=1 environment variable to force CPU usage
+    device = 'cpu' if os.environ.get('FORCE_CPU') else None
+    _worker_model = SentenceTransformer(model_name, device=device)
 
 
 def _compute_embeddings_in_worker(triplet_data: Dict, clustering_method: str) -> Dict:
@@ -55,6 +65,7 @@ def _compute_embeddings_in_worker(triplet_data: Dict, clustering_method: str) ->
         Dictionary with distributions and prompt_id
     """
     global _worker_model
+    import torch
     from sdm_package.text_utils import compute_triplet_distributions
 
     # Compute distributions using existing SDM infrastructure
@@ -68,6 +79,12 @@ def _compute_embeddings_in_worker(triplet_data: Dict, clustering_method: str) ->
 
     # Add prompt_id to result
     dist_result['prompt_id'] = triplet_data.get('prompt_id', 'unknown')
+
+    # Clear GPU memory after computation to prevent OOM errors
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    elif torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     return dist_result
 

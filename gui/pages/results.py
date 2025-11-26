@@ -7,6 +7,10 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import json
+from datetime import datetime
+from pathlib import Path
+from pages.markdown_utils import markdown_to_html
+
 
 def create():
     """Create the results page content"""
@@ -16,6 +20,12 @@ def create():
         results = app.storage.user.get('analysis_results')
     except Exception:
         results = None
+
+    # Get LLM pipeline results for answer selection
+    try:
+        llm_results = app.storage.user.get('llm_pipeline_results')
+    except Exception:
+        llm_results = None
 
     # Validate that all required keys are present
     required_keys = ['F_S', 'SEP_total', 'SEP_system', 'H_Q', 'H_C', 'H_A', 'p_q', 'p_c', 'p_a', 'n_clusters']
@@ -27,6 +37,19 @@ def create():
         return
 
     display_results = results
+
+    # Extract triplets and F_S scores if available
+    triplets = []
+    fs_scores = {}
+    if llm_results:
+        triplets = llm_results.get('triplets', [])
+        fs_scores_raw = llm_results.get('fs_scores', {})
+        # Normalize fs_scores
+        for pid, score_data in dict(fs_scores_raw).items():
+            if isinstance(score_data, dict):
+                fs_scores[pid] = float(score_data.get('F_S', 0))
+            else:
+                fs_scores[pid] = float(score_data) if score_data is not None else 0.0
 
     with ui.column().classes('w-full max-w-6xl mx-auto p-8'):
         ui.label('Analysis Results').classes('text-h4 mb-6')
@@ -67,10 +90,225 @@ def create():
                 ui.label('H(A)').classes('text-subtitle2')
                 ui.label(f"{display_results['H_A']:.4f} bits").classes('text-h5')
 
+        # Answer Selection and Export Section
+        # Show if we have triplets from LLM pipeline (even just one)
+        if triplets and fs_scores:
+            ui.separator().classes('my-6')
+            ui.label('Answer Selection & Export').classes('text-h6 mb-4')
+
+            # State for selected answer
+            export_state = {
+                'selected_answer': None,
+                'selected_prompt_id': None,
+                'selection_method': None
+            }
+
+            # Check if there's a judge result from the Judge page
+            judge_result = app.storage.user.get('judge_result')
+            if judge_result:
+                with ui.card().classes('w-full p-4 mb-4 bg-amber-50'):
+                    with ui.row().classes('items-center gap-2'):
+                        ui.icon('gavel', color='amber')
+                        ui.label(f"LLM Judge selected: {judge_result.get('winner_pid', 'N/A')}").classes('text-subtitle1 font-bold')
+                    ui.label(f"Compared: {' vs '.join(judge_result.get('compared', []))}").classes('text-caption text-grey-6')
+
+            with ui.card().classes('w-full p-6 mb-4'):
+                ui.label('Choose Best Answer').classes('text-subtitle1 font-bold mb-4')
+
+                # Build options for dropdown
+                answer_options = {}
+                for t in triplets:
+                    pid = t.get('prompt_id', '')
+                    fs = fs_scores.get(pid, 0)
+                    answer_options[pid] = f"{pid} (F_S: {fs:.4f})"
+
+                # Selection method buttons (only show if multiple answers)
+                if len(triplets) > 1:
+                    with ui.row().classes('w-full gap-4 mb-4'):
+                        async def select_highest_fs():
+                            """Select answer with highest F_S score (highest faithfulness)"""
+                            if fs_scores:
+                                # Higher F_S is better, so find max
+                                best_pid = max(fs_scores.items(), key=lambda x: x[1])[0]
+                                answer_select.value = best_pid
+                                export_state['selection_method'] = 'Highest F_S Score'
+                                ui.notify(f'Selected {best_pid} with highest F_S score', type='positive')
+
+                        async def select_manual():
+                            """Allow manual selection"""
+                            export_state['selection_method'] = 'Manual Selection'
+                            ui.notify('Please select an answer from the dropdown', type='info')
+
+                        async def use_judge_winner():
+                            """Use the winner from LLM-as-a-Judge"""
+                            if judge_result and judge_result.get('winner_pid'):
+                                answer_select.value = judge_result['winner_pid']
+                                export_state['selection_method'] = 'LLM-as-a-Judge Winner'
+                                ui.notify(f"Selected {judge_result['winner_pid']} (LLM Judge winner)", type='positive')
+                            else:
+                                ui.notify('No LLM Judge result available. Go to the Judge page first.', type='warning')
+
+                        ui.button('Select Best (Highest F_S)', icon='emoji_events', on_click=select_highest_fs).props('color=primary')
+                        if judge_result:
+                            ui.button('Use Judge Winner', icon='gavel', on_click=use_judge_winner).props('color=secondary')
+                        else:
+                            ui.button('Go to Judge', icon='gavel', on_click=lambda: ui.navigate.to('/judge')).props('outline')
+                        ui.button('Manual Selection', icon='touch_app', on_click=select_manual).props('outline')
+                else:
+                    # Single answer - auto-select it
+                    export_state['selection_method'] = 'Single Answer'
+
+                # Answer dropdown
+                ui.label('Selected Answer:').classes('text-subtitle2 mt-4 mb-2')
+                answer_select = ui.select(
+                    options=answer_options,
+                    value=list(answer_options.keys())[0] if answer_options else None,
+                    on_change=lambda e: update_selected_answer(e.value)
+                ).classes('w-full')
+
+                # Answer preview
+                answer_preview = ui.card().classes('w-full p-4 mt-4 bg-grey-1')
+                answer_preview_content = ui.column().classes('w-full')
+
+                def update_selected_answer(prompt_id):
+                    """Update the answer preview when selection changes"""
+                    export_state['selected_prompt_id'] = prompt_id
+                    for t in triplets:
+                        if t.get('prompt_id') == prompt_id:
+                            export_state['selected_answer'] = t.get('answer', '')
+                            break
+
+                    answer_preview_content.clear()
+                    with answer_preview_content:
+                        if export_state['selected_answer']:
+                            ui.label('Answer Preview:').classes('text-subtitle2 font-bold mb-2')
+                            # Convert markdown to HTML for proper formatting
+                            preview_html = markdown_to_html(export_state['selected_answer'])
+                            ui.html(preview_html, sanitize=False).classes('text-body2 max-h-96 overflow-auto')
+                            ui.label(f'Total length: {len(export_state["selected_answer"])} characters').classes('text-caption text-grey-6 mt-2')
+
+                # Initialize preview
+                if answer_options:
+                    update_selected_answer(list(answer_options.keys())[0])
+
+            # Export Options
+            with ui.card().classes('w-full p-6'):
+                ui.label('Export Options').classes('text-subtitle1 font-bold mb-4')
+
+                with ui.row().classes('w-full gap-4'):
+                    async def export_markdown():
+                        """Export selected answer as Markdown"""
+                        if not export_state['selected_answer']:
+                            ui.notify('Please select an answer first', type='warning')
+                            return
+
+                        # Get question and context
+                        question = ''
+                        context = ''
+                        for t in triplets:
+                            if t.get('prompt_id') == export_state['selected_prompt_id']:
+                                question = t.get('question', '')
+                                context = t.get('context', '')
+                                break
+
+                        # Generate markdown
+                        md_content = generate_markdown_report(
+                            question=question,
+                            context=context,
+                            answer=export_state['selected_answer'],
+                            prompt_id=export_state['selected_prompt_id'],
+                            fs_score=fs_scores.get(export_state['selected_prompt_id'], 0),
+                            selection_method=export_state.get('selection_method', 'Manual'),
+                            metrics=display_results
+                        )
+
+                        # Download
+                        filename = f"answer_{export_state['selected_prompt_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+                        ui.download(md_content.encode('utf-8'), filename)
+                        ui.notify(f'Exported as {filename}', type='positive')
+
+                    async def export_pdf():
+                        """Export selected answer as PDF"""
+                        if not export_state['selected_answer']:
+                            ui.notify('Please select an answer first', type='warning')
+                            return
+
+                        try:
+                            from reportlab.lib.pagesizes import letter
+                            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+                            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                            from reportlab.lib.units import inch
+                            import io
+
+                            # Get question and context
+                            question = ''
+                            context = ''
+                            for t in triplets:
+                                if t.get('prompt_id') == export_state['selected_prompt_id']:
+                                    question = t.get('question', '')
+                                    context = t.get('context', '')
+                                    break
+
+                            # Create PDF
+                            buffer = io.BytesIO()
+                            doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+
+                            styles = getSampleStyleSheet()
+                            title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=16, spaceAfter=12)
+                            heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=12, spaceAfter=6, spaceBefore=12)
+                            body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, spaceAfter=6)
+                            metric_style = ParagraphStyle('Metric', parent=styles['Normal'], fontSize=10, leftIndent=20)
+
+                            story = []
+
+                            # Title
+                            story.append(Paragraph(f"Semantic Faithfulness Analysis Report", title_style))
+                            story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", body_style))
+                            story.append(Spacer(1, 12))
+
+                            # Metrics
+                            story.append(Paragraph("Analysis Metrics", heading_style))
+                            story.append(Paragraph(f"• F_S (Semantic Faithfulness): {display_results['F_S']:.4f}", metric_style))
+                            story.append(Paragraph(f"• SEP Total: {display_results['SEP_total']:.4f} bits", metric_style))
+                            story.append(Paragraph(f"• Selection Method: {export_state.get('selection_method', 'Manual')}", metric_style))
+                            story.append(Paragraph(f"• Prompt ID: {export_state['selected_prompt_id']}", metric_style))
+                            story.append(Spacer(1, 12))
+
+                            # Question
+                            story.append(Paragraph("Question", heading_style))
+                            # Escape HTML entities
+                            safe_question = question.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                            story.append(Paragraph(safe_question, body_style))
+                            story.append(Spacer(1, 12))
+
+                            # Answer
+                            story.append(Paragraph("Selected Answer", heading_style))
+                            safe_answer = export_state['selected_answer'].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                            # Split long answer into paragraphs
+                            for para in safe_answer.split('\n\n'):
+                                if para.strip():
+                                    story.append(Paragraph(para.replace('\n', '<br/>'), body_style))
+
+                            doc.build(story)
+
+                            # Download
+                            filename = f"answer_{export_state['selected_prompt_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                            ui.download(buffer.getvalue(), filename)
+                            ui.notify(f'Exported as {filename}', type='positive')
+
+                        except ImportError:
+                            ui.notify('PDF export requires reportlab. Install with: pip install reportlab', type='negative')
+                        except Exception as e:
+                            ui.notify(f'PDF export error: {str(e)}', type='negative')
+
+                    ui.button('Export as Markdown', icon='description', on_click=export_markdown).props('color=primary')
+                    ui.button('Export as PDF', icon='picture_as_pdf', on_click=export_pdf).props('outline')
+
         # Cache Statistics (only if available)
         if 'cache_stats' in display_results:
             cache_stats = display_results['cache_stats']
-            ui.label('Cache Statistics').classes('text-h6 mb-4 mt-6')
+            ui.separator().classes('my-6')
+            ui.label('Cache Statistics').classes('text-h6 mb-4')
             with ui.card().classes('w-full p-6'):
                 ui.label('Performance Optimization').classes('text-subtitle1 mb-4')
 
@@ -136,6 +374,7 @@ def create():
                         ui.label('Significant time and API cost savings from caching!').classes('text-caption text-green-600')
 
         # Visualizations
+        ui.separator().classes('my-6')
         ui.label('Visualizations').classes('text-h6 mb-4')
         with ui.tabs().classes('w-full') as viz_tabs:
             dist_tab = ui.tab('Distributions')
@@ -162,6 +401,60 @@ def create():
         with ui.row().classes('gap-4 mt-8'):
             ui.button('Export JSON', icon='download', on_click=lambda: export_json(display_results)).props('outline')
             ui.button('New Analysis', on_click=lambda: ui.navigate.to('/input')).props('color=primary')
+
+
+def generate_markdown_report(question, context, answer, prompt_id, fs_score, selection_method, metrics):
+    """Generate a Markdown report for the selected answer"""
+    md = f"""# Semantic Faithfulness Analysis Report
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+---
+
+## Analysis Metrics
+
+| Metric | Value |
+|--------|-------|
+| F_S (Semantic Faithfulness) | {metrics['F_S']:.4f} |
+| SEP Total | {metrics['SEP_total']:.4f} bits |
+| SEP System | {metrics['SEP_system']:.4f} bits |
+| H(Q) | {metrics['H_Q']:.4f} bits |
+| H(C) | {metrics['H_C']:.4f} bits |
+| H(A) | {metrics['H_A']:.4f} bits |
+
+---
+
+## Selection Details
+
+- **Prompt ID:** {prompt_id}
+- **F_S Score:** {fs_score:.4f}
+- **Selection Method:** {selection_method}
+
+---
+
+## Question
+
+{question}
+
+---
+
+## Selected Answer
+
+{answer}
+
+---
+
+## Context Summary
+
+*Context length: {len(context)} characters*
+
+{context[:1000]}{'...' if len(context) > 1000 else ''}
+
+---
+
+*Report generated by Semantic Faithfulness Analyzer*
+"""
+    return md
 
 
 def plot_distributions(results):
@@ -287,13 +580,13 @@ def display_statistics(results):
             ui.label('Sentence Counts').classes('text-subtitle1 font-bold mb-2')
             with ui.grid(columns=2).classes('w-full gap-4'):
                 ui.label('Question sentences:').classes('text-grey-7')
-                ui.label(f"{len(results['question_sentences'])}").classes('font-bold')
+                ui.label(f"{len(results.get('question_sentences', []))}").classes('font-bold')
 
                 ui.label('Context sentences:').classes('text-grey-7')
-                ui.label(f"{len(results['context_sentences'])}").classes('font-bold')
+                ui.label(f"{len(results.get('context_sentences', []))}").classes('font-bold')
 
                 ui.label('Answer sentences:').classes('text-grey-7')
-                ui.label(f"{len(results['answer_sentences'])}").classes('font-bold')
+                ui.label(f"{len(results.get('answer_sentences', []))}").classes('font-bold')
 
         # Interpretation guide
         with ui.card().classes('w-full p-4'):

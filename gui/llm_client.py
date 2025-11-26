@@ -246,6 +246,149 @@ Please provide a detailed answer based on the context above."""
 
         return answers
 
+    async def judge_answers(
+        self,
+        question: str,
+        context: str,
+        answer_a: str,
+        answer_b: str,
+        answer_a_label: str = "Answer A",
+        answer_b_label: str = "Answer B"
+    ) -> Dict:
+        """
+        Use LLM-as-a-Judge to compare two answers and determine which is better.
+
+        Based on the methodology from Zheng et al. (2023) "Judging LLM-as-a-Judge
+        with MT-Bench and Chatbot Arena."
+
+        Args:
+            question: The original question
+            context: The context used to generate the answers
+            answer_a: First answer to compare
+            answer_b: Second answer to compare
+            answer_a_label: Label for first answer (e.g., "Initial Answer")
+            answer_b_label: Label for second answer (e.g., "Best F_S Answer")
+
+        Returns:
+            Dict containing:
+                - winner: 'A', 'B', or 'TIE'
+                - explanation: Detailed reasoning
+                - scores: Dict with scores for each answer (1-10)
+                - criteria_breakdown: Dict with scores per criterion
+        """
+        system_prompt = """You are an expert evaluator assessing the quality of answers to questions based on provided context.
+
+Your task is to compare two answers and determine which one is better. Evaluate based on these criteria:
+
+1. **Faithfulness to Context**: Does the answer accurately reflect information from the context without hallucinations?
+2. **Completeness**: Does the answer address all aspects of the question?
+3. **Coherence**: Is the answer well-organized and logically structured?
+4. **Relevance**: Does the answer focus on what was asked without unnecessary tangents?
+
+IMPORTANT: Base your evaluation ONLY on how well each answer represents the information in the context. Do not prefer answers simply because they are longer or more detailed if that additional detail is not supported by the context.
+
+Respond in the following JSON format ONLY (no other text):
+{
+    "winner": "A" or "B" or "TIE",
+    "scores": {
+        "A": <1-10>,
+        "B": <1-10>
+    },
+    "criteria_breakdown": {
+        "faithfulness": {"A": <1-10>, "B": <1-10>},
+        "completeness": {"A": <1-10>, "B": <1-10>},
+        "coherence": {"A": <1-10>, "B": <1-10>},
+        "relevance": {"A": <1-10>, "B": <1-10>}
+    },
+    "explanation": "<detailed explanation of your judgment>"
+}"""
+
+        # Truncate context if too long
+        max_context_chars = 8000
+        truncated_context = context[:max_context_chars]
+        if len(context) > max_context_chars:
+            truncated_context += "\n\n[Context truncated for evaluation...]"
+
+        user_prompt = f"""## Question
+{question}
+
+## Context
+{truncated_context}
+
+## {answer_a_label} (Answer A)
+{answer_a}
+
+## {answer_b_label} (Answer B)
+{answer_b}
+
+Please evaluate which answer better represents the information from the context."""
+
+        client = self._get_client()
+
+        try:
+            if self.provider == LLMProvider.OPENAI:
+                response = await client.chat.completions.create(
+                    model=self.model.value,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.1,  # Low temperature for consistent evaluation
+                    max_tokens=1500
+                )
+                content = response.choices[0].message.content
+
+            elif self.provider == LLMProvider.ANTHROPIC:
+                response = await client.messages.create(
+                    model=self.model.value,
+                    max_tokens=1500,
+                    temperature=0.1,
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_prompt}
+                    ]
+                )
+                content = response.content[0].text
+
+            elif self.provider == LLMProvider.GEMINI:
+                full_prompt = f"{system_prompt}\n\n{user_prompt}"
+                response = await client.generate_content_async(
+                    full_prompt,
+                    generation_config={'temperature': 0.1, 'max_output_tokens': 1500}
+                )
+                content = response.text
+
+            # Parse JSON response
+            import json
+            import re
+
+            # Try to extract JSON from response
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                result = json.loads(json_match.group())
+                return {
+                    'winner': result.get('winner', 'TIE'),
+                    'explanation': result.get('explanation', 'No explanation provided'),
+                    'scores': result.get('scores', {'A': 5, 'B': 5}),
+                    'criteria_breakdown': result.get('criteria_breakdown', {})
+                }
+            else:
+                # Fallback if JSON parsing fails
+                return {
+                    'winner': 'TIE',
+                    'explanation': f'Could not parse evaluation. Raw response: {content[:500]}',
+                    'scores': {'A': 5, 'B': 5},
+                    'criteria_breakdown': {}
+                }
+
+        except Exception as e:
+            return {
+                'winner': 'ERROR',
+                'explanation': f'Evaluation failed: {str(e)}',
+                'scores': {'A': 0, 'B': 0},
+                'criteria_breakdown': {}
+            }
+
 
 def get_available_models(provider: LLMProvider) -> List[LLMModel]:
     """Get list of available models for a provider"""

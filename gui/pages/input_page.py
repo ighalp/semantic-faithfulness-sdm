@@ -215,36 +215,32 @@ def create():
                     ui.label('Context Source').classes('text-subtitle2 font-bold mt-4 mb-2')
                     form_data['context_source'] = ui.select(
                         options={
-                            'text': 'Manual Text Input',
-                            'url': 'Fetch from URL',
-                            'pdf': 'Upload PDF Document'
+                            'url': 'Fetch from URL(s)',
+                            'pdf': 'Upload PDF Document(s)',
+                            'text': 'Manual Text Input'
                         },
-                        value=last_context_source
+                        value=last_context_source if last_context_source in ['url', 'pdf', 'text'] else 'url'
                     ).classes('w-full')
 
                     # Context input containers (shown/hidden based on selection)
-                    # Text context (default)
-                    context_text_container = ui.column().classes('w-full')
-                    with context_text_container:
-                        ui.label('Context').classes('text-subtitle2 font-bold mt-4 mb-2')
-                        form_data['llm_context'] = ui.textarea(
-                            placeholder='Enter the source context or document...'
-                        ).classes('w-full').props('rows=8')
-
-                    # URL context
-                    context_url_container = ui.column().classes('w-full').style('display: none')
+                    # URL context (default - shown first)
+                    context_url_container = ui.column().classes('w-full')
                     with context_url_container:
-                        ui.label('Context URL').classes('text-subtitle2 font-bold mt-4 mb-2')
-                        form_data['context_url'] = ui.input(
-                            placeholder='https://example.com/article...',
+                        ui.label('Context URLs').classes('text-subtitle2 font-bold mt-4 mb-2')
+                        form_data['context_url'] = ui.textarea(
+                            placeholder='Enter one or more URLs (one per line):\nhttps://example.com/article1\nhttps://example.com/article2',
                             value=last_url
-                        ).classes('w-full')
-                        ui.label('The page content will be fetched and converted to text').classes('text-caption text-grey-6')
+                        ).classes('w-full').props('rows=4')
+                        ui.label('Enter one URL per line. Content from all URLs will be fetched and combined.').classes('text-caption text-grey-6')
 
                     # PDF context
                     context_pdf_container = ui.column().classes('w-full').style('display: none')
                     with context_pdf_container:
-                        ui.label('Upload PDF').classes('text-subtitle2 font-bold mt-4 mb-2')
+                        ui.label('Upload PDFs').classes('text-subtitle2 font-bold mt-4 mb-2')
+
+                        # Store uploaded PDF texts
+                        form_data['pdf_contexts'] = []
+                        pdf_status_label = ui.label('No PDFs uploaded yet').classes('text-caption text-grey-6')
 
                         def handle_pdf_upload(e):
                             try:
@@ -255,15 +251,32 @@ def create():
                                 text = ''
                                 for page in pdf_reader.pages:
                                     text += page.extract_text() + '\n'
-                                form_data['pdf_context'] = text.strip()
+                                form_data['pdf_contexts'].append(text.strip())
+                                pdf_status_label.text = f'{len(form_data["pdf_contexts"])} PDF(s) uploaded, {sum(len(t) for t in form_data["pdf_contexts"])} total characters'
                                 ui.notify(f'PDF loaded: {len(text)} characters', type='positive')
                             except Exception as ex:
                                 ui.notify(f'PDF error: {str(ex)}', type='negative')
 
                         ui.upload(
                             on_upload=handle_pdf_upload,
-                            auto_upload=True
+                            auto_upload=True,
+                            multiple=True
                         ).props('accept=.pdf').classes('w-full')
+
+                        def clear_pdfs():
+                            form_data['pdf_contexts'] = []
+                            pdf_status_label.text = 'No PDFs uploaded yet'
+                            ui.notify('PDFs cleared', type='info')
+
+                        ui.button('Clear PDFs', on_click=clear_pdfs).props('flat size=sm')
+
+                    # Text context
+                    context_text_container = ui.column().classes('w-full').style('display: none')
+                    with context_text_container:
+                        ui.label('Context').classes('text-subtitle2 font-bold mt-4 mb-2')
+                        form_data['llm_context'] = ui.textarea(
+                            placeholder='Enter the source context or document...'
+                        ).classes('w-full').props('rows=8')
 
                     # Update visibility based on selection
                     def update_context_source(e):
@@ -279,38 +292,38 @@ def create():
                         sys.stdout.flush()
 
                         # Since the select uses numeric indices (0, 1, 2), map them back to keys
-                        source_map = {0: 'text', 1: 'url', 2: 'pdf'}
+                        source_map = {0: 'url', 1: 'pdf', 2: 'text'}
                         if isinstance(source, int):
-                            source = source_map.get(source, 'text')
+                            source = source_map.get(source, 'url')
 
-                        if source == 'text':
-                            context_text_container.style('display: block')
-                            context_url_container.style('display: none')
-                            context_pdf_container.style('display: none')
-                        elif source == 'url':
-                            context_text_container.style('display: none')
+                        if source == 'url':
                             context_url_container.style('display: block')
                             context_pdf_container.style('display: none')
-                        elif source == 'pdf':
                             context_text_container.style('display: none')
+                        elif source == 'pdf':
                             context_url_container.style('display: none')
                             context_pdf_container.style('display: block')
+                            context_text_container.style('display: none')
+                        elif source == 'text':
+                            context_url_container.style('display: none')
+                            context_pdf_container.style('display: none')
+                            context_text_container.style('display: block')
 
                     form_data['context_source'].on('update:model-value', update_context_source)
 
                     # Initialize visibility based on last_context_source
-                    if last_context_source == 'text':
-                        context_text_container.style('display: block')
-                        context_url_container.style('display: none')
-                        context_pdf_container.style('display: none')
-                    elif last_context_source == 'url':
-                        context_text_container.style('display: none')
+                    if last_context_source == 'url' or last_context_source not in ['url', 'pdf', 'text']:
                         context_url_container.style('display: block')
                         context_pdf_container.style('display: none')
-                    elif last_context_source == 'pdf':
                         context_text_container.style('display: none')
+                    elif last_context_source == 'pdf':
                         context_url_container.style('display: none')
                         context_pdf_container.style('display: block')
+                        context_text_container.style('display: none')
+                    elif last_context_source == 'text':
+                        context_url_container.style('display: none')
+                        context_pdf_container.style('display: none')
+                        context_text_container.style('display: block')
 
                     # Info box
                     with ui.card().classes('w-full mt-4 bg-blue-50 border-l-4 border-blue-500'):
@@ -619,41 +632,89 @@ async def start_llm_pipeline(form_data):
         context = (form_data['llm_context'].value or '').strip()
         question = (form_data['llm_question'].value or '').strip()
     elif context_source == 'url':
-        context_url = (form_data['context_url'].value or '').strip()
-        print(f"[DEBUG] context_url value: '{context_url}'")
+        # Support multiple URLs (one per line)
+        context_urls_raw = (form_data['context_url'].value or '').strip()
+        print(f"[DEBUG] context_urls value: '{context_urls_raw}'")
         sys.stdout.flush()
-        if not context_url:
-            ui.notify('Please provide a URL for the context source', type='negative')
+        if not context_urls_raw:
+            ui.notify('Please provide at least one URL for the context source', type='negative')
             return
-        # Fetch URL content
+
+        # Parse URLs (one per line, skip empty lines)
+        context_urls = [url.strip() for url in context_urls_raw.split('\n') if url.strip()]
+        if not context_urls:
+            ui.notify('Please provide at least one valid URL', type='negative')
+            return
+
+        # Fetch content from all URLs
+        all_contexts = []
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.get(context_url) as response:
-                    if response.status == 200:
-                        html_content = await response.text()
-                        # Convert HTML to text (simple approach)
-                        from bs4 import BeautifulSoup
-                        soup = BeautifulSoup(html_content, 'html.parser')
-                        context = soup.get_text(separator='\n', strip=True)
-                        ui.notify('Context loaded from URL', type='positive')
-                    else:
-                        ui.notify(f'Failed to fetch URL: {response.status}', type='negative')
-                        return
+            from bs4 import BeautifulSoup
+
+            # Use proper headers to avoid being blocked by sites like Wikipedia
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            }
+
+            async with aiohttp.ClientSession(headers=headers) as session:
+                for i, url in enumerate(context_urls):
+                    ui.notify(f'Fetching URL {i+1}/{len(context_urls)}...', type='info')
+                    try:
+                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            if response.status == 200:
+                                html_content = await response.text()
+                                soup = BeautifulSoup(html_content, 'html.parser')
+                                # Remove script and style elements for cleaner text
+                                for element in soup(['script', 'style', 'nav', 'footer', 'header']):
+                                    element.decompose()
+                                page_text = soup.get_text(separator='\n', strip=True)
+                                all_contexts.append(f"--- Content from {url} ---\n{page_text}")
+                            else:
+                                ui.notify(f'Failed to fetch {url}: {response.status}', type='warning')
+                    except Exception as url_error:
+                        ui.notify(f'Error fetching {url}: {str(url_error)}', type='warning')
+
+            if not all_contexts:
+                ui.notify('Failed to fetch any URL content', type='negative')
+                return
+
+            context = '\n\n'.join(all_contexts)
+            ui.notify(f'Context loaded from {len(all_contexts)} URL(s)', type='positive')
         except Exception as e:
-            ui.notify(f'Error fetching URL: {str(e)}', type='negative')
+            ui.notify(f'Error fetching URLs: {str(e)}', type='negative')
             return
         question = (form_data['llm_question'].value or '').strip()
     elif context_source == 'pdf':
-        # PDF upload handled separately via file upload
-        if 'pdf_context' not in form_data or not form_data['pdf_context']:
-            ui.notify('Please upload a PDF file', type='negative')
+        # PDF upload handled separately via file upload - now supports multiple PDFs
+        if 'pdf_contexts' not in form_data or not form_data['pdf_contexts']:
+            ui.notify('Please upload at least one PDF file', type='negative')
             return
-        context = form_data['pdf_context']
+        # Combine all PDF contexts
+        context = '\n\n--- Next PDF Document ---\n\n'.join(form_data['pdf_contexts'])
         question = (form_data['llm_question'].value or '').strip()
     else:
         context = (form_data['llm_context'].value or '').strip()
         question = (form_data['llm_question'].value or '').strip()
+
+    # Automatic context truncation to prevent memory issues
+    # Limit to ~300K characters which should handle 3-5 Wikipedia pages
+    MAX_CONTEXT_CHARS = 300000
+    if len(context) > MAX_CONTEXT_CHARS:
+        original_len = len(context)
+        context = context[:MAX_CONTEXT_CHARS]
+        # Try to truncate at a sentence boundary
+        last_period = context.rfind('.')
+        if last_period > MAX_CONTEXT_CHARS * 0.8:  # Only truncate at period if reasonably close to limit
+            context = context[:last_period + 1]
+        ui.notify(
+            f'⚠️ Context truncated from {original_len:,} to {len(context):,} characters to prevent memory issues',
+            type='warning',
+            timeout=10000
+        )
+        print(f"[WARNING] Context truncated from {original_len:,} to {len(context):,} characters")
 
     # Validate inputs
     if not api_key:
