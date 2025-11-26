@@ -331,9 +331,9 @@ def create():
             if provider_str == 'openai':
                 api_key = os.environ.get('OPENAI_API_KEY', '')
             elif provider_str == 'anthropic':
-                api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+                api_key = os.environ.get('ANTHROPIC_API_KEY', '') or os.environ.get('CLAUDE_API_KEY', '')
             elif provider_str == 'gemini':
-                api_key = os.environ.get('GOOGLE_API_KEY', '')
+                api_key = os.environ.get('GOOGLE_API_KEY', '') or os.environ.get('GEMINI_API_KEY', '')
 
             if not api_key:
                 ui.notify('No API key found. Please configure LLM settings on the Input page.', type='negative')

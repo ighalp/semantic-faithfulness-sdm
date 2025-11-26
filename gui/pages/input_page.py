@@ -620,6 +620,14 @@ async def start_llm_pipeline(form_data):
                     api_key_source = 'ANTHROPIC_API_KEY environment variable'
                 else:
                     api_key_source = 'CLAUDE_API_KEY environment variable'
+        elif provider_value == 'gemini':
+            # Try both GOOGLE_API_KEY and GEMINI_API_KEY
+            api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY', '')
+            if api_key:
+                if os.getenv('GOOGLE_API_KEY'):
+                    api_key_source = 'GOOGLE_API_KEY environment variable'
+                else:
+                    api_key_source = 'GEMINI_API_KEY environment variable'
 
     # Get context - either from text or URL/PDF
     context_source = form_data['context_source'].value
@@ -720,6 +728,8 @@ async def start_llm_pipeline(form_data):
     if not api_key:
         if provider_value == 'openai':
             ui.notify('Please provide an API key (form input, OPENAI_API_KEY environment variable, or .env file)', type='negative')
+        elif provider_value == 'gemini':
+            ui.notify('Please provide an API key (form input, GOOGLE_API_KEY/GEMINI_API_KEY environment variable, or .env file)', type='negative')
         else:
             ui.notify('Please provide an API key (form input, ANTHROPIC_API_KEY/CLAUDE_API_KEY environment variable, or .env file)', type='negative')
         return
