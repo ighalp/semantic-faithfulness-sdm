@@ -229,8 +229,73 @@ def create():
         # Initialize comparison display on page load
         ui.timer(0.1, update_comparison, once=True)
 
-        # Run LLM Judge button
+        # LLM Judge Model Selection
         ui.separator().classes('my-4')
+
+        with ui.card().classes('w-full p-6 mb-4'):
+            ui.label('Judge Model Selection').classes('text-h6 mb-4')
+
+            # Get the model used for answer generation
+            default_provider = app.storage.user.get('llm_last_provider', 'anthropic')
+            default_model = app.storage.user.get('llm_last_model', 'claude-sonnet-4-5-20250929')
+
+            # Build model options organized by provider
+            model_options = {
+                'OpenAI': {
+                    'gpt-4o': 'GPT-4o',
+                    'gpt-4o-mini': 'GPT-4o Mini',
+                    'o1-preview': 'o1-preview',
+                    'o1-mini': 'o1-mini',
+                },
+                'Anthropic': {
+                    'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5',
+                    'claude-opus-4-1': 'Claude Opus 4.1',
+                    'claude-sonnet-4': 'Claude Sonnet 4',
+                    'claude-haiku-4-5': 'Claude Haiku 4.5',
+                    'claude-3-5-sonnet-20241022': 'Claude Sonnet 3.5',
+                },
+                'Google Gemini': {
+                    'gemini-2.5-pro': 'Gemini 2.5 Pro',
+                    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+                    'gemini-2.0-flash-exp': 'Gemini 2.0 Flash Exp',
+                }
+            }
+
+            # Flatten for dropdown with provider prefix
+            flat_options = {}
+            for provider_name, models in model_options.items():
+                for model_id, model_name in models.items():
+                    flat_options[model_id] = f"{model_name} ({provider_name})"
+
+            # State for judge model
+            judge_model_state = {'model': default_model, 'provider': default_provider}
+
+            with ui.row().classes('w-full gap-4 items-end'):
+                with ui.column().classes('flex-1'):
+                    with ui.row().classes('items-center gap-2 mb-2'):
+                        ui.label('Judge Model').classes('text-subtitle2')
+                        ui.badge('Default: Same as answer generation', color='blue').props('outline')
+
+                    def on_judge_model_change(e):
+                        judge_model_state['model'] = e.value
+                        # Determine provider from model
+                        if e.value.startswith('gpt') or e.value.startswith('o1'):
+                            judge_model_state['provider'] = 'openai'
+                        elif e.value.startswith('claude'):
+                            judge_model_state['provider'] = 'anthropic'
+                        elif e.value.startswith('gemini'):
+                            judge_model_state['provider'] = 'gemini'
+
+                    judge_model_select = ui.select(
+                        label='Select Judge Model',
+                        options=flat_options,
+                        value=default_model,
+                        on_change=on_judge_model_change
+                    ).classes('w-full')
+
+                with ui.column():
+                    ui.label('Tip').classes('text-caption text-grey-6')
+                    ui.label('Use a different model for independent evaluation').classes('text-caption text-grey-6')
 
         with ui.row().classes('w-full items-center gap-4'):
             run_button = ui.button('Run LLM-as-a-Judge', icon='gavel').props('color=primary size=lg')
@@ -258,18 +323,17 @@ def create():
                 ui.notify('Please select two different answers', type='warning')
                 return
 
-            # Get LLM settings - use same keys as input_page.py
-            provider_str = app.storage.user.get('llm_last_provider', 'anthropic')
-            model_str = app.storage.user.get('llm_last_model', 'claude-sonnet-4-5-20250929')
+            # Get LLM settings from judge model selection
+            provider_str = judge_model_state['provider']
+            model_str = judge_model_state['model']
             api_key = ''
 
-            if not api_key:
-                if provider_str == 'openai':
-                    api_key = os.environ.get('OPENAI_API_KEY', '')
-                elif provider_str == 'anthropic':
-                    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
-                elif provider_str == 'gemini':
-                    api_key = os.environ.get('GOOGLE_API_KEY', '')
+            if provider_str == 'openai':
+                api_key = os.environ.get('OPENAI_API_KEY', '')
+            elif provider_str == 'anthropic':
+                api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+            elif provider_str == 'gemini':
+                api_key = os.environ.get('GOOGLE_API_KEY', '')
 
             if not api_key:
                 ui.notify('No API key found. Please configure LLM settings on the Input page.', type='negative')
@@ -316,6 +380,9 @@ def create():
                 # Store the compared prompt IDs for reference
                 judge_state['compared_left'] = left_pid
                 judge_state['compared_right'] = right_pid
+                # Store which model was used as judge
+                judge_state['judge_model'] = model_str
+                judge_state['judge_provider'] = provider_str
 
                 # Determine recommended answer
                 if result['winner'] == 'A':
@@ -329,7 +396,7 @@ def create():
                     judge_state['recommended_pid'] = left_pid if fs_left >= fs_right else right_pid
 
                 # Display results using the actual compared prompts
-                display_results(result, judge_state['compared_left'], judge_state['compared_right'])
+                display_results(result, judge_state['compared_left'], judge_state['compared_right'], model_str)
 
                 # Show export section
                 export_container.classes(remove='hidden')
@@ -345,15 +412,20 @@ def create():
                 run_button.enable()
                 spinner.classes(add='hidden')
 
-        def display_results(result, compared_left_pid, compared_right_pid):
+        def display_results(result, compared_left_pid, compared_right_pid, judge_model_used):
             """Display the LLM-as-a-Judge results"""
             display_left = str(compared_left_pid)
             display_right = str(compared_right_pid)
 
+            # Get friendly model name
+            model_display_name = flat_options.get(judge_model_used, judge_model_used)
+
             results_container.clear()
 
             with results_container:
-                ui.label('LLM Judge Evaluation Results').classes('text-h5 mb-4')
+                with ui.row().classes('items-center gap-4 mb-4'):
+                    ui.label('LLM Judge Evaluation Results').classes('text-h5')
+                    ui.badge(f'Judge: {model_display_name}', color='purple').props('outline')
 
                 # Winner card
                 with ui.card().classes('w-full p-6 mb-4 bg-amber-50'):
