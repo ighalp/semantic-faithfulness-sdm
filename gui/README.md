@@ -208,6 +208,16 @@ The backend orchestrates:
 - SDM analysis engine for computing semantic faithfulness metrics
 - Caching of embeddings, distributions, and LLM responses
 
+### Core SDM Package
+
+The `sdm_package/` directory contains the computational engine:
+
+- **`SDM.py`**: Main `SemanticFaithfulnessAnalyzer` class that handles tokenization, embedding, and distribution computation
+- **`compute_semantic_faithfulness.py`**: Implements the SF and SEP metric calculations using information-theoretic methods
+- **`DIB_with_KL_upper_bound.py`**: Upper-Bounded Deterministic Information Bottleneck (UDIB) clustering algorithm for semantic topic discovery
+
+This package can be used independently of the GUI for programmatic analysis (see main README for API examples).
+
 ### Visualization: Plotly
 
 Interactive charts are rendered using [Plotly](https://plotly.com/python/), including:
