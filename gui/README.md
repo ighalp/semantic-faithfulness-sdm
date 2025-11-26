@@ -159,9 +159,9 @@ The application will:
 - `sentence-transformers/all-mpnet-base-v2` (Balanced)
 
 ### LLM Providers
-- **OpenAI**: GPT-4o, GPT-4o-mini, o1-preview
-- **Anthropic**: Claude Sonnet 4.5, Claude Opus 4.1, Claude Haiku 4.5
-- **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash
+- **OpenAI**: GPT-4o, GPT-4o-mini, o1-preview, o1-mini
+- **Anthropic**: Claude Sonnet 4.5, Claude Opus 4.1, Claude Sonnet 4, Claude Haiku 4.5, Claude Sonnet 3.5
+- **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Exp
 
 ### Clustering Methods
 - **UDIB** (Default): Upper-Bounded Deterministic Information Bottleneck
@@ -170,11 +170,15 @@ The application will:
 
 ## Output Metrics
 
-### Semantic Faithfulness (F_S)
+### Semantic Faithfulness (SF)
 Value between 0 and 1 indicating how well the answer aligns with the optimal information channel.
-- **F_S > 0.85**: High faithfulness
-- **0.65 < F_S < 0.85**: Moderate faithfulness
-- **F_S < 0.65**: Low faithfulness (potential hallucination)
+
+The following are *indicative* ranges for interpretation (the method does not specify hard thresholds):
+- **SF ~ 0.85+**: Typically indicates high faithfulness
+- **SF ~ 0.65-0.85**: Typically indicates moderate faithfulness
+- **SF ~ below 0.65**: May indicate lower faithfulness (potential hallucination)
+
+Actual interpretation depends on the specific use case and should be calibrated based on your domain.
 
 ### Semantic Entropy Production (SEP)
 Measures irreversibility in the answer generation process.
