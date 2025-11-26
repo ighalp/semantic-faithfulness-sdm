@@ -253,7 +253,8 @@ Please provide a detailed answer based on the context above."""
         answer_a: str,
         answer_b: str,
         answer_a_label: str = "Answer A",
-        answer_b_label: str = "Answer B"
+        answer_b_label: str = "Answer B",
+        custom_system_prompt: str = None
     ) -> Dict:
         """
         Use LLM-as-a-Judge to compare two answers and determine which is better.
@@ -276,7 +277,7 @@ Please provide a detailed answer based on the context above."""
                 - scores: Dict with scores for each answer (1-10)
                 - criteria_breakdown: Dict with scores per criterion
         """
-        system_prompt = """You are an expert evaluator assessing the quality of answers to questions based on provided context.
+        default_system_prompt = """You are an expert evaluator assessing the quality of answers to questions based on provided context.
 
 Your task is to compare two answers and determine which one is better. Evaluate based on these criteria:
 
@@ -287,21 +288,9 @@ Your task is to compare two answers and determine which one is better. Evaluate 
 
 IMPORTANT: Base your evaluation ONLY on how well each answer represents the information in the context. Do not prefer answers simply because they are longer or more detailed if that additional detail is not supported by the context.
 
-Respond in the following JSON format ONLY (no other text):
-{
-    "winner": "A" or "B" or "TIE",
-    "scores": {
-        "A": <1-10>,
-        "B": <1-10>
-    },
-    "criteria_breakdown": {
-        "faithfulness": {"A": <1-10>, "B": <1-10>},
-        "completeness": {"A": <1-10>, "B": <1-10>},
-        "coherence": {"A": <1-10>, "B": <1-10>},
-        "relevance": {"A": <1-10>, "B": <1-10>}
-    },
-    "explanation": "<detailed explanation of your judgment>"
-}"""
+Provide scores from 1-10 for each answer on each criterion, overall scores, determine the winner (A, B, or TIE), and provide a detailed explanation of your judgment."""
+
+        system_prompt = custom_system_prompt if custom_system_prompt else default_system_prompt
 
         # Truncate context if too long
         max_context_chars = 8000
@@ -325,7 +314,48 @@ Please evaluate which answer better represents the information from the context.
 
         client = self._get_client()
 
+        # Define JSON schema for structured output
+        json_schema = {
+            "type": "object",
+            "properties": {
+                "winner": {
+                    "type": "string",
+                    "enum": ["A", "B", "TIE"],
+                    "description": "The winning answer: A, B, or TIE"
+                },
+                "score_a": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Score for Answer A (1-10)"
+                },
+                "score_b": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Score for Answer B (1-10)"
+                },
+                "faithfulness_a": {"type": "integer", "minimum": 1, "maximum": 10},
+                "faithfulness_b": {"type": "integer", "minimum": 1, "maximum": 10},
+                "completeness_a": {"type": "integer", "minimum": 1, "maximum": 10},
+                "completeness_b": {"type": "integer", "minimum": 1, "maximum": 10},
+                "coherence_a": {"type": "integer", "minimum": 1, "maximum": 10},
+                "coherence_b": {"type": "integer", "minimum": 1, "maximum": 10},
+                "relevance_a": {"type": "integer", "minimum": 1, "maximum": 10},
+                "relevance_b": {"type": "integer", "minimum": 1, "maximum": 10},
+                "explanation": {
+                    "type": "string",
+                    "description": "Detailed explanation of the judgment"
+                }
+            },
+            "required": ["winner", "score_a", "score_b", "explanation"]
+        }
+
+        import json
+
         try:
+            result = None
+
             if self.provider == LLMProvider.OPENAI:
                 response = await client.chat.completions.create(
                     model=self.model.value,
@@ -333,12 +363,21 @@ Please evaluate which answer better represents the information from the context.
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=0.1,  # Low temperature for consistent evaluation
-                    max_tokens=1500
+                    temperature=0.1,
+                    max_tokens=1500,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "judge_evaluation",
+                            "strict": True,
+                            "schema": json_schema
+                        }
+                    }
                 )
-                content = response.choices[0].message.content
+                result = json.loads(response.choices[0].message.content)
 
             elif self.provider == LLMProvider.ANTHROPIC:
+                # Anthropic uses tool_use for structured output
                 response = await client.messages.create(
                     model=self.model.value,
                     max_tokens=1500,
@@ -346,37 +385,87 @@ Please evaluate which answer better represents the information from the context.
                     system=system_prompt,
                     messages=[
                         {"role": "user", "content": user_prompt}
-                    ]
+                    ],
+                    tools=[{
+                        "name": "submit_evaluation",
+                        "description": "Submit the evaluation results",
+                        "input_schema": json_schema
+                    }],
+                    tool_choice={"type": "tool", "name": "submit_evaluation"}
                 )
-                content = response.content[0].text
+                # Extract from tool use response
+                for block in response.content:
+                    if block.type == "tool_use" and block.name == "submit_evaluation":
+                        result = block.input
+                        break
 
             elif self.provider == LLMProvider.GEMINI:
+                # Gemini uses response_schema for structured output
+                import google.generativeai as genai
+
+                # Recreate client with JSON mode
+                generation_config = genai.GenerationConfig(
+                    temperature=0.1,
+                    max_output_tokens=1500,
+                    response_mime_type="application/json",
+                    response_schema={
+                        "type": "object",
+                        "properties": {
+                            "winner": {"type": "string", "enum": ["A", "B", "TIE"]},
+                            "score_a": {"type": "integer"},
+                            "score_b": {"type": "integer"},
+                            "faithfulness_a": {"type": "integer"},
+                            "faithfulness_b": {"type": "integer"},
+                            "completeness_a": {"type": "integer"},
+                            "completeness_b": {"type": "integer"},
+                            "coherence_a": {"type": "integer"},
+                            "coherence_b": {"type": "integer"},
+                            "relevance_a": {"type": "integer"},
+                            "relevance_b": {"type": "integer"},
+                            "explanation": {"type": "string"}
+                        },
+                        "required": ["winner", "score_a", "score_b", "explanation"]
+                    }
+                )
                 full_prompt = f"{system_prompt}\n\n{user_prompt}"
                 response = await client.generate_content_async(
                     full_prompt,
-                    generation_config={'temperature': 0.1, 'max_output_tokens': 1500}
+                    generation_config=generation_config
                 )
-                content = response.text
+                result = json.loads(response.text)
 
-            # Parse JSON response
-            import json
-            import re
-
-            # Try to extract JSON from response
-            json_match = re.search(r'\{[\s\S]*\}', content)
-            if json_match:
-                result = json.loads(json_match.group())
+            if result:
+                # Convert flat schema to nested structure expected by UI
                 return {
                     'winner': result.get('winner', 'TIE'),
                     'explanation': result.get('explanation', 'No explanation provided'),
-                    'scores': result.get('scores', {'A': 5, 'B': 5}),
-                    'criteria_breakdown': result.get('criteria_breakdown', {})
+                    'scores': {
+                        'A': result.get('score_a', 5),
+                        'B': result.get('score_b', 5)
+                    },
+                    'criteria_breakdown': {
+                        'faithfulness': {
+                            'A': result.get('faithfulness_a', 5),
+                            'B': result.get('faithfulness_b', 5)
+                        },
+                        'completeness': {
+                            'A': result.get('completeness_a', 5),
+                            'B': result.get('completeness_b', 5)
+                        },
+                        'coherence': {
+                            'A': result.get('coherence_a', 5),
+                            'B': result.get('coherence_b', 5)
+                        },
+                        'relevance': {
+                            'A': result.get('relevance_a', 5),
+                            'B': result.get('relevance_b', 5)
+                        }
+                    }
                 }
             else:
-                # Fallback if JSON parsing fails
                 return {
                     'winner': 'TIE',
-                    'explanation': f'Could not parse evaluation. Raw response: {content[:500]}',
+                    'explanation': 'Could not parse evaluation response',
                     'scores': {'A': 5, 'B': 5},
                     'criteria_breakdown': {}
                 }

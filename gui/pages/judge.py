@@ -297,6 +297,53 @@ def create():
                     ui.label('Tip').classes('text-caption text-grey-6')
                     ui.label('Use a different model for independent evaluation').classes('text-caption text-grey-6')
 
+        # Custom prompt section
+        with ui.card().classes('w-full p-6 mb-4'):
+            with ui.row().classes('items-center gap-2 mb-4'):
+                ui.label('Judge Instructions').classes('text-h6')
+                ui.badge('Customizable', color='green').props('outline')
+
+            # Default prompt text
+            default_judge_prompt = """You are an expert evaluator assessing the quality of answers to questions based on provided context.
+
+Your task is to compare two answers and determine which one is better. Evaluate based on these criteria:
+
+1. **Faithfulness to Context**: Does the answer accurately reflect information from the context without hallucinations?
+2. **Completeness**: Does the answer address all aspects of the question?
+3. **Coherence**: Is the answer well-organized and logically structured?
+4. **Relevance**: Does the answer focus on what was asked without unnecessary tangents?
+
+IMPORTANT: Base your evaluation ONLY on how well each answer represents the information in the context. Do not prefer answers simply because they are longer or more detailed if that additional detail is not supported by the context.
+
+Provide scores from 1-10 for each answer on each criterion, overall scores, determine the winner (A, B, or TIE), and provide a detailed explanation of your judgment."""
+
+            # State for custom prompt
+            prompt_state = {'prompt': default_judge_prompt, 'is_custom': False}
+
+            with ui.expansion('Edit Judge Prompt', icon='edit').classes('w-full'):
+                ui.label('Customize the instructions given to the LLM judge. You can modify the evaluation criteria or add specific questions.').classes('text-caption text-grey-6 mb-4')
+
+                prompt_textarea = ui.textarea(
+                    label='System Prompt for Judge',
+                    value=default_judge_prompt
+                ).classes('w-full').props('outlined rows=12')
+
+                def on_prompt_change(e):
+                    prompt_state['prompt'] = e.value
+                    prompt_state['is_custom'] = (e.value.strip() != default_judge_prompt.strip())
+
+                prompt_textarea.on('update:model-value', on_prompt_change)
+
+                with ui.row().classes('w-full gap-4 mt-4'):
+                    def reset_prompt():
+                        prompt_textarea.value = default_judge_prompt
+                        prompt_state['prompt'] = default_judge_prompt
+                        prompt_state['is_custom'] = False
+                        ui.notify('Prompt reset to default', type='info')
+
+                    ui.button('Reset to Default', on_click=reset_prompt, icon='restore').props('outline')
+                    ui.label('Changes are applied when you run the judge').classes('text-caption text-grey-6 self-center')
+
         with ui.row().classes('w-full items-center gap-4'):
             run_button = ui.button('Run LLM-as-a-Judge', icon='gavel').props('color=primary size=lg')
             spinner = ui.spinner('dots', size='lg').classes('hidden')
@@ -367,13 +414,17 @@ def create():
                 question = prompts_dict[left_pid]['text']
                 context = prompts_dict[left_pid]['context']
 
+                # Use custom prompt if modified, otherwise None (will use default)
+                custom_prompt = prompt_state['prompt'] if prompt_state['is_custom'] else None
+
                 result = await llm_client.judge_answers(
                     question=question,
                     context=context,
                     answer_a=answers_dict[left_pid]['answer'],
                     answer_b=answers_dict[right_pid]['answer'],
                     answer_a_label=f"Answer A ({left_pid})",
-                    answer_b_label=f"Answer B ({right_pid})"
+                    answer_b_label=f"Answer B ({right_pid})",
+                    custom_system_prompt=custom_prompt
                 )
 
                 judge_state['result'] = result
@@ -498,7 +549,9 @@ def create():
                 # Explanation
                 with ui.card().classes('w-full p-6 mb-4'):
                     ui.label('Detailed Explanation').classes('text-h6 mb-4')
-                    ui.label(result.get('explanation', 'No explanation provided')).classes('text-body1 whitespace-pre-wrap')
+                    explanation_text = result.get('explanation', 'No explanation provided')
+                    explanation_html = markdown_to_html(explanation_text)
+                    ui.html(explanation_html, sanitize=False).classes('text-body1')
 
                 # F_S vs LLM comparison
                 with ui.card().classes('w-full p-6 bg-purple-50'):
