@@ -133,66 +133,22 @@ def create():
 
         # Store references in a dict for access from nested functions
         selectors = {}
+        comparison_container = None  # Will be set after UI is created
 
-        # Selection controls card
-        with ui.card().classes('w-full p-6 mb-4'):
-            ui.label('Select Answers to Compare').classes('text-h6 mb-4')
-
-            with ui.row().classes('w-full gap-4 items-end'):
-                selectors['left'] = ui.select(
-                    label='Left Pane (Baseline)',
-                    options=triplet_options,
-                    value=initial_pid
-                ).classes('flex-1')
-
-                selectors['right'] = ui.select(
-                    label='Right Pane (Comparison)',
-                    options=triplet_options,
-                    value=lowest_fs_pid
-                ).classes('flex-1')
-
-            compare_btn = ui.button('Compare', icon='compare_arrows').props('color=primary')
-
-            # Quick selection buttons - handlers defined inline, do_compare looked up at call time
-            with ui.row().classes('w-full gap-4 mt-4'):
-                async def select_initial_vs_highest():
-                    """Select Initial vs Highest F_S (best)"""
-                    if fs_scores:
-                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1], reverse=True)
-                        highest_fs_pid = sorted_by_fs[0][0]
-                        selectors['left'].value = initial_pid
-                        selectors['right'].value = highest_fs_pid
-                        await do_compare()
-
-                async def select_initial_vs_lowest():
-                    """Select Initial vs Lowest F_S"""
-                    selectors['left'].value = initial_pid
-                    selectors['right'].value = lowest_fs_pid
-                    await do_compare()
-
-                async def select_highest_vs_lowest():
-                    """Select Highest F_S vs Lowest F_S"""
-                    if fs_scores:
-                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1])
-                        lowest = sorted_by_fs[0][0]
-                        highest = sorted_by_fs[-1][0]
-                        selectors['left'].value = highest
-                        selectors['right'].value = lowest
-                        await do_compare()
-
-                ui.button('Initial vs Highest F_S', on_click=select_initial_vs_highest, icon='arrow_upward').props('outline size=sm')
-                ui.button('Initial vs Lowest F_S', on_click=select_initial_vs_lowest, icon='arrow_downward').props('outline size=sm')
-                ui.button('Highest vs Lowest F_S', on_click=select_highest_vs_lowest, icon='swap_vert').props('outline size=sm')
-
-        # Comparison display container
-        comparison_container = ui.column().classes('w-full')
-
+        # Define do_compare function that will be referenced by buttons
         async def do_compare():
             """Perform the comparison"""
+            nonlocal comparison_container
+            if comparison_container is None:
+                return
             comparison_container.clear()
 
-            left_pid = selectors['left'].value
-            right_pid = selectors['right'].value
+            left_pid = selectors.get('left')
+            right_pid = selectors.get('right')
+            if left_pid:
+                left_pid = left_pid.value
+            if right_pid:
+                right_pid = right_pid.value
 
             if not left_pid or not right_pid:
                 with comparison_container:
@@ -283,8 +239,65 @@ def create():
                     ui.html('<span style="background-color: #ffeb3b; padding: 2px 8px;">Highlighted</span>', sanitize=False)
                     ui.label('= Text unique to this version or substantially different').classes('text-caption text-grey-6')
 
-        # Bind compare button
-        compare_btn.on('click', do_compare)
+        # Selection controls card
+        with ui.card().classes('w-full p-6 mb-4'):
+            ui.label('Select Answers to Compare').classes('text-h6 mb-4')
+
+            with ui.row().classes('w-full gap-4 items-end'):
+                selectors['left'] = ui.select(
+                    label='Left Pane (Baseline)',
+                    options=triplet_options,
+                    value=initial_pid
+                ).classes('flex-1')
+
+                selectors['right'] = ui.select(
+                    label='Right Pane (Comparison)',
+                    options=triplet_options,
+                    value=lowest_fs_pid
+                ).classes('flex-1')
+
+            compare_btn = ui.button('Compare', icon='compare_arrows').props('color=primary')
+            compare_btn.on('click', do_compare)
+
+            # Quick selection buttons
+            with ui.row().classes('w-full gap-4 mt-4'):
+                async def select_initial_vs_highest():
+                    """Select Initial vs Highest F_S (best)"""
+                    if fs_scores:
+                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1], reverse=True)
+                        highest_fs_pid = sorted_by_fs[0][0]
+                        selectors['left'].value = initial_pid
+                        selectors['right'].value = highest_fs_pid
+                        selectors['left'].update()
+                        selectors['right'].update()
+                        await do_compare()
+
+                async def select_initial_vs_lowest():
+                    """Select Initial vs Lowest F_S"""
+                    selectors['left'].value = initial_pid
+                    selectors['right'].value = lowest_fs_pid
+                    selectors['left'].update()
+                    selectors['right'].update()
+                    await do_compare()
+
+                async def select_highest_vs_lowest():
+                    """Select Highest F_S vs Lowest F_S"""
+                    if fs_scores:
+                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1])
+                        lowest = sorted_by_fs[0][0]
+                        highest = sorted_by_fs[-1][0]
+                        selectors['left'].value = highest
+                        selectors['right'].value = lowest
+                        selectors['left'].update()
+                        selectors['right'].update()
+                        await do_compare()
+
+                ui.button('Initial vs Highest F_S', on_click=select_initial_vs_highest, icon='arrow_upward').props('outline size=sm')
+                ui.button('Initial vs Lowest F_S', on_click=select_initial_vs_lowest, icon='arrow_downward').props('outline size=sm')
+                ui.button('Highest vs Lowest F_S', on_click=select_highest_vs_lowest, icon='swap_vert').props('outline size=sm')
+
+        # Now create the comparison container (after controls)
+        comparison_container = ui.column().classes('w-full')
 
         # Auto-compare on load
         async def init_compare():

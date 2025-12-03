@@ -121,63 +121,23 @@ def create():
                 ui.icon('gavel', color='blue')
                 ui.label('LLM-as-a-Judge evaluates answers on: Faithfulness, Completeness, Coherence, Relevance').classes('text-subtitle2')
 
-        # Selection controls
-        with ui.card().classes('w-full p-6 mb-4'):
-            ui.label('Select Answers to Evaluate').classes('text-h6 mb-4')
-
-            # Store references in a dict for access from nested functions
-            selectors = {}
-
-            with ui.row().classes('w-full gap-4 items-end'):
-                selectors['left'] = ui.select(
-                    label='Answer A (Left)',
-                    options=triplet_options,
-                    value=default_left
-                ).classes('flex-1')
-
-                selectors['right'] = ui.select(
-                    label='Answer B (Right)',
-                    options=triplet_options,
-                    value=default_right
-                ).classes('flex-1')
-
-            # Quick selection buttons
-            with ui.row().classes('w-full gap-4 mt-4'):
-                def select_initial_vs_highest():
-                    if fs_scores:
-                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1], reverse=True)
-                        highest_fs_pid = sorted_by_fs[0][0]
-                        selectors['left'].value = initial_pid
-                        selectors['right'].value = highest_fs_pid
-                        update_comparison()
-
-                def select_initial_vs_lowest():
-                    selectors['left'].value = initial_pid
-                    selectors['right'].value = lowest_fs_pid
-                    update_comparison()
-
-                def select_highest_vs_lowest():
-                    if fs_scores:
-                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1])
-                        lowest = sorted_by_fs[0][0]
-                        highest = sorted_by_fs[-1][0]
-                        selectors['left'].value = highest
-                        selectors['right'].value = lowest
-                        update_comparison()
-
-                ui.button('Initial vs Highest F_S', on_click=select_initial_vs_highest, icon='arrow_upward').props('outline size=sm')
-                ui.button('Initial vs Lowest F_S', on_click=select_initial_vs_lowest, icon='arrow_downward').props('outline size=sm')
-                ui.button('Highest vs Lowest F_S', on_click=select_highest_vs_lowest, icon='swap_vert').props('outline size=sm')
-
-        # Side-by-side answer display container
-        comparison_container = ui.column().classes('w-full')
+        # Store references in a dict for access from nested functions
+        selectors = {}
+        comparison_container = None  # Will be set after UI is created
 
         def update_comparison(e=None):
             """Update the side-by-side answer display"""
+            nonlocal comparison_container
+            if comparison_container is None:
+                return
             comparison_container.clear()
 
-            left_pid = selectors['left'].value
-            right_pid = selectors['right'].value
+            left_pid = selectors.get('left')
+            right_pid = selectors.get('right')
+            if left_pid:
+                left_pid = left_pid.value
+            if right_pid:
+                right_pid = right_pid.value
 
             if not left_pid or not right_pid or left_pid == right_pid:
                 with comparison_container:
@@ -221,6 +181,60 @@ def create():
 
                         html_right = generate_diff_html(left_answer, right_answer, side='right')
                         ui.html(html_right, sanitize=False).classes('text-body2 whitespace-pre-wrap max-h-96 overflow-auto')
+
+        # Selection controls
+        with ui.card().classes('w-full p-6 mb-4'):
+            ui.label('Select Answers to Evaluate').classes('text-h6 mb-4')
+
+            with ui.row().classes('w-full gap-4 items-end'):
+                selectors['left'] = ui.select(
+                    label='Answer A (Left)',
+                    options=triplet_options,
+                    value=default_left
+                ).classes('flex-1')
+
+                selectors['right'] = ui.select(
+                    label='Answer B (Right)',
+                    options=triplet_options,
+                    value=default_right
+                ).classes('flex-1')
+
+            # Quick selection buttons
+            with ui.row().classes('w-full gap-4 mt-4'):
+                def select_initial_vs_highest():
+                    if fs_scores:
+                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1], reverse=True)
+                        highest_fs_pid = sorted_by_fs[0][0]
+                        selectors['left'].value = initial_pid
+                        selectors['right'].value = highest_fs_pid
+                        selectors['left'].update()
+                        selectors['right'].update()
+                        update_comparison()
+
+                def select_initial_vs_lowest():
+                    selectors['left'].value = initial_pid
+                    selectors['right'].value = lowest_fs_pid
+                    selectors['left'].update()
+                    selectors['right'].update()
+                    update_comparison()
+
+                def select_highest_vs_lowest():
+                    if fs_scores:
+                        sorted_by_fs = sorted(fs_scores.items(), key=lambda x: x[1])
+                        lowest = sorted_by_fs[0][0]
+                        highest = sorted_by_fs[-1][0]
+                        selectors['left'].value = highest
+                        selectors['right'].value = lowest
+                        selectors['left'].update()
+                        selectors['right'].update()
+                        update_comparison()
+
+                ui.button('Initial vs Highest F_S', on_click=select_initial_vs_highest, icon='arrow_upward').props('outline size=sm')
+                ui.button('Initial vs Lowest F_S', on_click=select_initial_vs_lowest, icon='arrow_downward').props('outline size=sm')
+                ui.button('Highest vs Lowest F_S', on_click=select_highest_vs_lowest, icon='swap_vert').props('outline size=sm')
+
+        # Side-by-side answer display container (after controls)
+        comparison_container = ui.column().classes('w-full')
 
         # Bind on_change handlers
         selectors['left'].on('update:model-value', update_comparison)

@@ -13,19 +13,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def create():
     """Create the analyze page content"""
 
-    print("[DEBUG] analyze.create() START")
-    import sys
-    sys.stdout.flush()
-
-    # Check if we have input data (either QCA triplet or cached distributions)
-    print("[DEBUG] Checking for input data...")
-    sys.stdout.flush()
+    # Check if we have input data
+    # - triplets_ready: from run_generation_stage() - need to run analysis
+    # - distributions_ready: from old pipeline - need to run F_S only
+    # - cached_distributions: from Load from Cache tab
     has_qca = app.storage.user.get('qca_triplet')
     has_cache = app.storage.user.get('cached_distributions')
-    print(f"[DEBUG] has_qca: {has_qca is not None}, has_cache: {has_cache is not None}")
-    sys.stdout.flush()
+    pipeline_results = app.storage.user.get('llm_pipeline_results')
+    analysis_status = app.storage.user.get('analysis_status')
+    has_triplets = pipeline_results and pipeline_results.get('triplets')
 
-    if not has_qca and not has_cache:
+    if not has_qca and not has_cache and not has_triplets:
         with ui.column().classes('w-full max-w-4xl mx-auto p-8'):
             ui.label('No Input Data').classes('text-h4 mb-6')
             ui.label('Please provide a QCA triplet or select cached data first.').classes('text-subtitle1 text-grey-7 mb-4')
@@ -33,45 +31,88 @@ def create():
         return
 
     # UI State
-    print("[DEBUG] Creating UI state dict...")
-    sys.stdout.flush()
     state = {
         'progress_bar': None,
         'status_label': None,
         'stage_chips': {},
         'start_button': None,
         'cancel_button': None,
+        'seed_input': None,
         'log_area': None,
         'analysis_task': None
     }
 
-    print("[DEBUG] About to create UI column...")
-    sys.stdout.flush()
+    # Check status: triplets_ready means we need to run full analysis (embedding + clustering + F_S)
+    # distributions_ready means we have distributions and only need F_S
+    triplets_ready = analysis_status == 'triplets_ready'
+    distributions_ready = has_cache and analysis_status == 'distributions_ready'
+
+    # Check if data was loaded from a cached session (last session)
+    from cache_manager import CacheManager
+    cache_dir = Path(__file__).parent.parent.parent / 'data' / 'cache'
+    cache = CacheManager(cache_dir)
+    last_session = cache.get_last_session()
+    is_from_cached_session = (last_session is not None and
+                              pipeline_results is not None and
+                              pipeline_results.get('triplets') == last_session.get('triplets'))
+
     with ui.column().classes('w-full max-w-4xl mx-auto p-8'):
         ui.label('Analysis').classes('text-h4 mb-6')
+
+        # Show previous session restored banner if applicable
+        if is_from_cached_session and has_triplets:
+            num_triplets = len(pipeline_results.get('triplets', []))
+            with ui.card().classes('w-full p-4 mb-4 bg-green-50 border-l-4 border-green-500'):
+                with ui.row().classes('items-center gap-4'):
+                    ui.icon('restore', size='sm').classes('text-green-600')
+                    with ui.column().classes('flex-1'):
+                        ui.label('Previous Session Restored').classes('text-subtitle2 font-bold')
+                        ui.label(f'{num_triplets} QCA triplets loaded from your last session. Click "Start Analysis" to compute F_S scores.').classes('text-body2')
+        # Show triplet summary if triplets are ready (but not from cache)
+        elif triplets_ready and has_triplets:
+            num_triplets = len(pipeline_results.get('triplets', []))
+            with ui.card().classes('w-full p-4 mb-4 bg-blue-50 border-l-4 border-blue-500'):
+                with ui.row().classes('items-center gap-4'):
+                    ui.icon('info', size='sm').classes('text-blue-500')
+                    ui.label(f'{num_triplets} QCA triplets ready for analysis. Click "Start Analysis" to compute embeddings, clusters, and F_S scores.').classes('text-body2')
 
         # Status card
         with ui.card().classes('w-full p-6 mb-6'):
             ui.label('Analysis Status').classes('text-h6 mb-4')
 
-            # Progress bar
-            state['progress_bar'] = ui.linear_progress(value=0).classes('w-full mb-4')
+            # Progress bar - show partial progress if distributions ready, 0 if triplets ready
+            initial_progress = 0.75 if distributions_ready else 0
+            state['progress_bar'] = ui.linear_progress(value=initial_progress).classes('w-full mb-4')
 
-            # Status message
-            state['status_label'] = ui.label('Ready to start analysis').classes('text-subtitle1 mb-4')
+            # Status message based on state
+            if triplets_ready:
+                initial_status = f'{len(pipeline_results.get("triplets", []))} triplets ready. Click "Start Analysis" to compute embeddings and F_S.'
+            elif distributions_ready:
+                initial_status = 'Distributions ready. Click "Start Analysis" to compute F_S.'
+            else:
+                initial_status = 'Ready to start analysis'
+            state['status_label'] = ui.label(initial_status).classes('text-subtitle1 mb-4')
 
-            # Stage indicators
+            # Stage indicators - mark first 3 as complete if distributions ready
             with ui.row().classes('w-full gap-4'):
-                state['stage_chips']['tokenization'] = ui.chip('Tokenization', icon='pending').props('outline color=grey')
-                state['stage_chips']['embedding'] = ui.chip('Embedding', icon='pending').props('outline color=grey')
-                state['stage_chips']['clustering'] = ui.chip('Clustering', icon='pending').props('outline color=grey')
-                state['stage_chips']['optimization'] = ui.chip('Optimization', icon='pending').props('outline color=grey')
+                if distributions_ready:
+                    state['stage_chips']['tokenization'] = ui.chip('Tokenization', icon='check_circle').props('outline color=green')
+                    state['stage_chips']['embedding'] = ui.chip('Embedding', icon='check_circle').props('outline color=green')
+                    state['stage_chips']['clustering'] = ui.chip('Clustering', icon='check_circle').props('outline color=green')
+                    state['stage_chips']['optimization'] = ui.chip('Optimization', icon='pending').props('outline color=grey')
+                else:
+                    state['stage_chips']['tokenization'] = ui.chip('Tokenization', icon='pending').props('outline color=grey')
+                    state['stage_chips']['embedding'] = ui.chip('Embedding', icon='pending').props('outline color=grey')
+                    state['stage_chips']['clustering'] = ui.chip('Clustering', icon='pending').props('outline color=grey')
+                    state['stage_chips']['optimization'] = ui.chip('Optimization', icon='pending').props('outline color=grey')
 
         # Control buttons
-        with ui.row().classes('gap-4'):
+        with ui.row().classes('gap-4 items-center'):
             state['start_button'] = ui.button('Start Analysis', on_click=lambda: run_analysis(state)).props('color=primary')
             state['cancel_button'] = ui.button('Cancel', on_click=lambda: cancel_analysis(state)).props('outline disabled')
             ui.button('Back to Input', on_click=lambda: ui.navigate.to('/input')).props('flat')
+            ui.label('Random Seed:').classes('ml-4')
+            state['seed_input'] = ui.number(value=42, min=0, max=999999999).classes('w-24')
 
         # Analysis log
         with ui.expansion('Analysis Log', icon='description').classes('w-full mt-6'):
@@ -80,8 +121,6 @@ def create():
 
     # DISABLE auto-start - user must manually click "Start Analysis"
     # This prevents WebSocket timeout during heavy imports
-    print("[DEBUG] analyze.create() COMPLETE - waiting for manual start")
-    sys.stdout.flush()
 
 
 async def run_cached_analysis(state, cached_dist):
@@ -89,7 +128,13 @@ async def run_cached_analysis(state, cached_dist):
     import numpy as np
     from scipy.stats import entropy
 
-    config_dict = app.storage.user['analysis_config']
+    # Get config with defaults if not set
+    config_dict = app.storage.user.get('analysis_config', {
+        'tolerance': 1e-7,
+        'max_iterations': 100,
+        'embedding_model': 'cached',
+        'clustering_method': 'cached'
+    })
 
     state['log_area'].push('╔═══════════════════════════════════════════════════════╗')
     state['log_area'].push('║         CACHED ANALYSIS MODE - FAST EXECUTION         ║')
@@ -173,6 +218,12 @@ async def run_cached_analysis(state, cached_dist):
         csf_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(csf_module)
         compute_semantic_faithfulness = csf_module.compute_semantic_faithfulness
+
+        # Set random seed for reproducible F_S optimization
+        # Use seed from UI if available, otherwise default to 42
+        seed = int(state['seed_input'].value) if state['seed_input'].value is not None else 42
+        np.random.seed(seed)
+        state['log_area'].push(f'   → Random seed set to {seed}')
 
         # Run optimization with progress updates
         state['log_area'].push('   ⚙ Optimization running...')
@@ -295,6 +346,155 @@ async def run_cached_analysis(state, cached_dist):
         state['cancel_button'].props('disabled')
 
 
+async def run_triplets_analysis(state, triplets, config_dict):
+    """Run analysis on generated triplets using pipeline.run_analysis_stage()"""
+    from scipy.stats import entropy
+    import numpy as np
+
+    # Get seed from UI if available, otherwise use config or default
+    seed = int(state['seed_input'].value) if state['seed_input'].value is not None else config_dict.get('seed', 42)
+
+    state['log_area'].push('╔═══════════════════════════════════════════════════════╗')
+    state['log_area'].push('║         TRIPLETS ANALYSIS - FULL PIPELINE             ║')
+    state['log_area'].push('╚═══════════════════════════════════════════════════════╝')
+    state['log_area'].push('')
+    state['log_area'].push(f'Number of triplets: {len(triplets)}')
+    state['log_area'].push(f'Embedding Model: {config_dict.get("embedding_model", "Qwen/Qwen3-Embedding-0.6B")}')
+    state['log_area'].push(f'Clustering Method: {config_dict.get("clustering_method", "spectral")}')
+    state['log_area'].push(f'Random Seed: {seed}')
+    state['log_area'].push('')
+
+    try:
+        # Import pipeline
+        from pipeline import SemanticFaithfulnessPipeline
+        from llm_client import LLMClient, LLMProvider, LLMModel
+
+        # Create a minimal LLM client (not used for analysis stage, but needed for pipeline init)
+        llm_client = LLMClient(provider=LLMProvider.ANTHROPIC, model=LLMModel.CLAUDE_SONNET_4_5, api_key='dummy')
+
+        output_dir = Path(__file__).parent.parent.parent / 'data' / 'llm_runs'
+        pipeline = SemanticFaithfulnessPipeline(
+            llm_client=llm_client,
+            output_dir=output_dir
+        )
+
+        # Progress callback for pipeline
+        async def update_pipeline_progress(step: str, current: int, total: int, message: str = ""):
+            state['log_area'].push(f'[{step.upper()}] {message}')
+            state['status_label'].text = f'{step}: {message}'
+
+            # Update progress bar based on step
+            if 'embedding' in step.lower():
+                state['progress_bar'].value = 0.1 + (0.4 * current / max(total, 1))
+                state['stage_chips']['embedding'].props('icon=hourglass_empty color=blue')
+            elif 'clustering' in step.lower() or 'loading' in step.lower():
+                state['progress_bar'].value = 0.5 + (0.2 * current / max(total, 1))
+                state['stage_chips']['embedding'].props('icon=check_circle color=green')
+                state['stage_chips']['clustering'].props('icon=hourglass_empty color=blue')
+            elif 'f_s' in step.lower() or 'computing' in step.lower():
+                state['progress_bar'].value = 0.7 + (0.25 * current / max(total, 1))
+                state['stage_chips']['clustering'].props('icon=check_circle color=green')
+                state['stage_chips']['optimization'].props('icon=hourglass_empty color=primary')
+            elif 'complete' in step.lower():
+                state['progress_bar'].value = 0.95
+                state['stage_chips']['optimization'].props('icon=check_circle color=positive')
+
+            await asyncio.sleep(0.1)
+
+        pipeline.progress_callback = update_pipeline_progress
+
+        # Run analysis stage
+        state['stage_chips']['tokenization'].props('icon=check_circle color=green')  # Triplets already tokenized
+        state['log_area'].push('[TOKENIZATION] Using pre-generated QCA triplets')
+
+        results = await pipeline.run_analysis_stage(
+            triplets=triplets,
+            embedding_model=config_dict.get('embedding_model', 'Qwen/Qwen3-Embedding-0.6B'),
+            clustering_method=config_dict.get('clustering_method', 'spectral'),
+            force_regenerate=False,
+            seed=seed
+        )
+
+        # Store results
+        fs_scores = results.get('fs_scores', {})
+        distributions = results.get('distributions', [])
+
+        if distributions:
+            # Use first distribution for detailed results
+            first_dist = distributions[0]
+            p_q = np.array(first_dist['p_q'])
+            p_c = np.array(first_dist['p_c'])
+            p_a = np.array(first_dist['p_a'])
+
+            # Get first F_S score
+            first_prompt_id = first_dist.get('prompt_id', 'prompt_0')
+            first_fs = fs_scores.get(first_prompt_id, {})
+
+            app.storage.user['analysis_results'] = {
+                'F_S': float(first_fs.get('F_S', 0)),
+                'SEP_total': float(first_fs.get('D_min', 0)),
+                'SEP_system': float(entropy(p_a, base=2) - entropy(p_c, base=2)),
+                'H_Q': float(entropy(p_q, base=2)),
+                'H_C': float(entropy(p_c, base=2)),
+                'H_A': float(entropy(p_a, base=2)),
+                'p_q': p_q.tolist(),
+                'p_c': p_c.tolist(),
+                'p_a': p_a.tolist(),
+                'n_clusters': len(p_q),
+                'iterations': first_fs.get('iterations', 0),
+                'converged': True,
+                'question_sentences': [],
+                'context_sentences': [],
+                'answer_sentences': [],
+                'Q_star': first_fs.get('Q_star', []),
+                'A_star': first_fs.get('A_star', [])
+            }
+
+        # Store all F_S scores for multi-triplet comparison
+        app.storage.user['all_fs_scores'] = fs_scores
+        app.storage.user['all_distributions'] = distributions
+        app.storage.user['analysis_status'] = 'completed'
+
+        # Also update llm_pipeline_results with fs_scores for Compare/Judge tabs
+        if app.storage.user.get('llm_pipeline_results'):
+            app.storage.user['llm_pipeline_results']['fs_scores'] = fs_scores
+            app.storage.user['llm_pipeline_results']['distributions'] = distributions
+
+        # Complete
+        state['progress_bar'].value = 1.0
+        state['status_label'].text = 'Analysis complete!'
+
+        # Final summary
+        state['log_area'].push('')
+        state['log_area'].push('╔═══════════════════════════════════════════════════════╗')
+        state['log_area'].push('║            ANALYSIS COMPLETE                          ║')
+        state['log_area'].push('╚═══════════════════════════════════════════════════════╝')
+        state['log_area'].push('')
+        state['log_area'].push(f'Processed {len(triplets)} triplets')
+        state['log_area'].push(f'Computed {len(fs_scores)} F_S scores')
+        if fs_scores:
+            avg_fs = sum(s.get('F_S', 0) for s in fs_scores.values()) / len(fs_scores)
+            state['log_area'].push(f'Average F_S: {avg_fs:.4f}')
+        state['log_area'].push('')
+        state['log_area'].push('→ Redirecting to results page...')
+
+        ui.notify('Analysis completed successfully!', type='positive')
+        await asyncio.sleep(1.5)
+        ui.navigate.to('/results')
+
+    except Exception as e:
+        state['log_area'].push(f'ERROR: {str(e)}')
+        state['status_label'].text = f'Error: {str(e)}'
+        ui.notify(f'Analysis failed: {str(e)}', type='negative')
+        app.storage.user['analysis_status'] = 'error'
+        import traceback
+        state['log_area'].push(traceback.format_exc())
+    finally:
+        state['analysis_task'] = None
+        state['start_button'].props(remove='disabled')
+        state['cancel_button'].props('disabled')
+
+
 async def run_analysis(state):
     """Execute the analysis in the background"""
 
@@ -310,11 +510,19 @@ async def run_analysis(state):
     state['log_area'].push('Starting Semantic Faithfulness Analysis')
     state['log_area'].push('=' * 60)
 
-    # Check if we're in cache mode FIRST (before any heavy imports!)
+    # Check what mode we're in
+    analysis_status = app.storage.user.get('analysis_status')
+    pipeline_results = app.storage.user.get('llm_pipeline_results')
     cached_dist = app.storage.user.get('cached_distributions')
 
+    # TRIPLETS MODE - triplets generated, need full analysis
+    if analysis_status == 'triplets_ready' and pipeline_results and pipeline_results.get('triplets'):
+        config_dict = app.storage.user.get('analysis_config', {})
+        await run_triplets_analysis(state, pipeline_results['triplets'], config_dict)
+        return
+
+    # CACHE MODE - Skip embedding/clustering, use pre-computed distributions
     if cached_dist:
-        # CACHE MODE - Skip embedding/clustering, use pre-computed distributions
         await run_cached_analysis(state, cached_dist)
         return
 
@@ -333,8 +541,12 @@ async def run_analysis(state):
         max_iterations=config_dict['max_iterations']
     )
 
+    # Get seed from UI input
+    seed = int(state['seed_input'].value) if state['seed_input'].value is not None else 42
+
     state['log_area'].push(f'Embedding Model: {config.embedding_model}')
     state['log_area'].push(f'Clustering Method: {config.clustering_method}')
+    state['log_area'].push(f'Random Seed: {seed}')
     state['log_area'].push(f'Tolerance: {config.tolerance}')
     state['log_area'].push(f'Max Iterations: {config.max_iterations}')
     state['log_area'].push('')

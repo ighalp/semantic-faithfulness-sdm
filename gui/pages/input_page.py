@@ -48,12 +48,12 @@ def create():
 
         # Input method tabs
         with ui.tabs().classes('w-full') as tabs:
-            tab_manual = ui.tab('Manual Input')
             tab_llm = ui.tab('LLM Generation')
+            tab_manual = ui.tab('Manual Input')
             tab_file = ui.tab('File Upload')
             tab_cache = ui.tab('Load from Cache')
 
-        with ui.tab_panels(tabs, value=tab_manual).classes('w-full'):
+        with ui.tab_panels(tabs, value=tab_llm).classes('w-full'):
             # Manual input panel
             with ui.tab_panel(tab_manual):
                 with ui.card().classes('w-full p-6'):
@@ -92,42 +92,63 @@ def create():
                     last_num_paraphrases = app.storage.user.get('llm_last_num_paraphrases', 3)
                     question_history = app.storage.user.get('llm_question_history', [])
 
+                    # Models organized by provider
+                    models_by_provider = {
+                        'openai': {
+                            'gpt-4o': 'GPT-4o',
+                            'gpt-4o-mini': 'GPT-4o Mini',
+                            'o1-preview': 'o1-preview (Reasoning)',
+                            'o1-mini': 'o1-mini (Reasoning)',
+                        },
+                        'anthropic': {
+                            'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5 (Latest)',
+                            'claude-opus-4-1': 'Claude Opus 4.1',
+                            'claude-sonnet-4-20250514': 'Claude Sonnet 4',
+                            'claude-haiku-4-5': 'Claude Haiku 4.5',
+                            'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
+                        },
+                        'gemini': {
+                            'gemini-2.5-pro': 'Gemini 2.5 Pro',
+                            'gemini-2.5-flash': 'Gemini 2.5 Flash',
+                            'gemini-2.0-flash-exp': 'Gemini 2.0 Flash (Experimental)',
+                        }
+                    }
+
+                    default_model_by_provider = {
+                        'openai': 'gpt-4o',
+                        'anthropic': 'claude-sonnet-4-5-20250929',
+                        'gemini': 'gemini-2.5-pro'
+                    }
+
+                    # Get initial models for current provider
+                    initial_provider = last_provider if last_provider in models_by_provider else 'anthropic'
+                    initial_models = models_by_provider[initial_provider]
+                    initial_model = last_model if last_model in initial_models else default_model_by_provider[initial_provider]
+
                     # LLM Provider selection
                     with ui.row().classes('w-full gap-4'):
                         with ui.column().classes('flex-1'):
                             ui.label('LLM Provider').classes('text-subtitle2 font-bold mb-2')
                             form_data['llm_provider'] = ui.select(
                                 options={'openai': 'OpenAI', 'anthropic': 'Anthropic', 'gemini': 'Google Gemini'},
-                                value=last_provider
+                                value=initial_provider
                             ).classes('w-full')
 
                         with ui.column().classes('flex-1'):
                             ui.label('Model').classes('text-subtitle2 font-bold mb-2')
                             form_data['llm_model'] = ui.select(
-                                options={
-                                    # OpenAI models (2025)
-                                    'gpt-5': 'GPT-5 (Latest)',
-                                    'gpt-5-codex': 'GPT-5 Codex',
-                                    'gpt-4.5': 'GPT-4.5',
-                                    'gpt-4o': 'GPT-4o',
-                                    'gpt-4o-mini': 'GPT-4o Mini',
-                                    'o1-preview': 'o1-preview (Reasoning)',
-                                    'o1-mini': 'o1-mini (Reasoning)',
-                                    # Anthropic models (2025)
-                                    'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5 (Latest)',
-                                    'claude-opus-4-1': 'Claude Opus 4.1',
-                                    'claude-sonnet-4': 'Claude Sonnet 4',
-                                    'claude-haiku-4-5': 'Claude Haiku 4.5',
-                                    'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
-                                    # Google Gemini models (2025)
-                                    'gemini-3-pro-image': 'Gemini 3 Pro Image (Latest)',
-                                    'gemini-2.5-pro': 'Gemini 2.5 Pro',
-                                    'gemini-2.5-flash': 'Gemini 2.5 Flash',
-                                    'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
-                                    'gemini-2.0-flash-exp': 'Gemini 2.0 Flash (Experimental)'
-                                },
-                                value=last_model
+                                options=initial_models,
+                                value=initial_model
                             ).classes('w-full')
+
+                    # Update models when provider changes
+                    def on_provider_change(e):
+                        new_provider = e.value
+                        new_models = models_by_provider.get(new_provider, models_by_provider['anthropic'])
+                        new_default = default_model_by_provider.get(new_provider, list(new_models.keys())[0])
+                        form_data['llm_model'].set_options(new_models, value=new_default)
+
+                    form_data['llm_provider'].on_value_change(on_provider_change)
 
                     # API Key input
                     with ui.row().classes('w-full gap-4 mt-4'):
@@ -242,11 +263,13 @@ def create():
                         form_data['pdf_contexts'] = []
                         pdf_status_label = ui.label('No PDFs uploaded yet').classes('text-caption text-grey-6')
 
-                        def handle_pdf_upload(e):
+                        async def handle_pdf_upload(e):
                             try:
                                 import PyPDF2
                                 import io
-                                pdf_file = io.BytesIO(e.content.read())
+                                # NiceGUI 3.3+ uses e.file.read() (async) instead of e.content.read()
+                                pdf_bytes = await e.file.read()
+                                pdf_file = io.BytesIO(pdf_bytes)
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
                                 text = ''
                                 for page in pdf_reader.pages:
@@ -347,9 +370,10 @@ def create():
                     ui.label('Upload QCA Triplet (JSON)').classes('text-h6 mb-4')
                     ui.label('Upload a JSON file containing QCA triplet(s)').classes('text-subtitle2 text-grey-7 mb-4')
 
-                    def handle_upload(e):
+                    async def handle_upload(e):
                         try:
-                            content = e.content.read().decode('utf-8')
+                            # NiceGUI 3.3+ uses e.file.read() (async) instead of e.content.read()
+                            content = await e.file.text()
                             data = json.loads(content)
 
                             # Load data into form
@@ -360,7 +384,7 @@ def create():
                             if 'answer' in data:
                                 form_data['answer'].value = data['answer']
 
-                            ui.notify(f'Loaded: {e.name}', type='positive')
+                            ui.notify(f'Loaded: {e.file.name}', type='positive')
                         except json.JSONDecodeError:
                             ui.notify('Invalid JSON file', type='negative')
                         except Exception as ex:
@@ -766,8 +790,8 @@ async def start_llm_pipeline(form_data):
     # Map model string to enum (2025 models)
     model_map = {
         # OpenAI models (2025)
-        'gpt-5': LLMModel.GPT5,
-        'gpt-5-codex': LLMModel.GPT5_CODEX,
+        # 'gpt-5': LLMModel.GPT5,
+        # 'gpt-5-codex': LLMModel.GPT5_CODEX,
         'gpt-4.5': LLMModel.GPT4_5,
         'gpt-4o': LLMModel.GPT4O,
         'gpt-4o-mini': LLMModel.GPT4O_MINI,
@@ -775,16 +799,16 @@ async def start_llm_pipeline(form_data):
         'o1-mini': LLMModel.O1_MINI,
         # Anthropic models (2025)
         'claude-sonnet-4-5-20250929': LLMModel.CLAUDE_SONNET_4_5,
-        'claude-opus-4-1': LLMModel.CLAUDE_OPUS_4_1,
+        # 'claude-opus-4-1': LLMModel.CLAUDE_OPUS_4_1,
         'claude-sonnet-4': LLMModel.CLAUDE_SONNET_4,
-        'claude-haiku-4-5': LLMModel.CLAUDE_HAIKU_4_5,
+        # 'claude-haiku-4-5': LLMModel.CLAUDE_HAIKU_4_5,
         'claude-3-5-sonnet-20241022': LLMModel.CLAUDE_SONNET_3_5,
         # Google Gemini models (2025)
         'gemini-3-pro-image': LLMModel.GEMINI_3_PRO_IMAGE,
         'gemini-2.5-pro': LLMModel.GEMINI_2_5_PRO,
         'gemini-2.5-flash': LLMModel.GEMINI_2_5_FLASH,
-        'gemini-2.5-flash-lite': LLMModel.GEMINI_2_5_FLASH_LITE,
-        'gemini-2.0-flash-exp': LLMModel.GEMINI_2_0_FLASH_EXP
+        # 'gemini-2.5-flash-lite': LLMModel.GEMINI_2_5_FLASH_LITE,
+        #'gemini-2.0-flash-exp': LLMModel.GEMINI_2_0_FLASH_EXP
     }
     model = model_map.get(model_value, LLMModel.CLAUDE_SONNET_4_5)  # Default to Claude Sonnet 4.5
 
