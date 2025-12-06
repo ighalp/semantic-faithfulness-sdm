@@ -240,18 +240,22 @@ Typical runtime: ~10-30 seconds per triplet on CPU
 
 ### 5.1 Faithfulness Thresholds
 
-Based on empirical analysis:
-- F_S > 0.85: High faithfulness
-- 0.65 < F_S < 0.85: Moderate faithfulness
-- F_S < 0.65: Low faithfulness
+**Note:** The following thresholds are *indicative* only. The actual range of F_S values depends on your specific prompt structure, context complexity, and experimental setup. Calibrate thresholds based on your domain and use case.
+
+Indicative ranges based on empirical analysis:
+- F_S > 0.85: Typically indicates high faithfulness
+- 0.65 < F_S < 0.85: Typically indicates moderate faithfulness
+- F_S < 0.65: May indicate lower faithfulness (potential hallucination)
 
 ### 5.2 Entropy Production Interpretation
 
-Typical SEP values:
-- < 0.1 bits: Very low (near-optimal)
-- 0.1-0.3 bits: Low (good faithfulness)
-- 0.3-0.5 bits: Moderate
-- > 0.5 bits: High (potential hallucination)
+**Note:** The following thresholds are *indicative* only. The actual range of SEP values will vary depending on your specific prompt, context variability, and experimental conditions. Use these as starting points and calibrate based on your particular experiments.
+
+Indicative SEP ranges:
+- < 0.1 bits: Typically very low (near-optimal)
+- 0.1-0.3 bits: Typically low (good faithfulness)
+- 0.3-0.5 bits: Typically moderate
+- > 0.5 bits: Typically high (potential hallucination)
 
 ### 5.3 Validation Approaches
 
