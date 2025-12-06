@@ -621,6 +621,9 @@ if __name__ in {"__main__", "__mp_main__"}:
     if auth_manager.is_enabled:
         register_auth_pages(base_url=APP_BASE_URL)
 
+    # Add static files directory for images/assets
+    app.add_static_files('/static', Path(__file__).parent)
+
     ui.run(
         title=APP_TITLE,
         port=APP_PORT,

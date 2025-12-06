@@ -6,10 +6,13 @@ from nicegui import ui
 
 def create():
     """Create the home page content"""
-    with ui.column().classes('w-full max-w-4xl mx-auto p-8'):
-        # Welcome header
-        ui.label('Paraphrase Me').classes('text-h3 font-bold mb-4')
-        ui.label('LLM Semantic Assistant - Information-Theoretic Evaluation').classes('text-h6 text-grey-7 mb-8')
+    with ui.column().classes('w-full max-w-6xl mx-auto p-8'):
+        # Welcome header with logo
+        with ui.row().classes('w-full items-center gap-8 mb-8'):
+            with ui.column().classes('flex-1 gap-2'):
+                ui.label('Paraphrase Me').classes('text-h2 font-bold')
+                ui.label('LLM Semantic Assistant - Information-Theoretic Evaluation').classes('text-h5 text-grey-7')
+            ui.image('/static/LLM_Maxwell_demon.png').classes('w-56 h-auto rounded-lg shadow-md')
 
         # What is this tool card
         with ui.card().classes('w-full p-6 mb-6 bg-blue-50'):
