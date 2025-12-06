@@ -186,6 +186,15 @@ Our experiments on NVIDIA 10-K financial disclosures show:
 
 **Key Finding**: Question semantic structure—not just entropy—drives faithfulness. Comprehensive questions with explicit structure achieve ~16% higher faithfulness.
 
+### Detecting Hallucinations Missed by LLM Judges
+
+The $\mathcal{F}_S$ metric can detect subtle hallucinations that LLM-as-a-Judge evaluations miss. See [`docs/examples/`](docs/examples/) for a documented case where:
+
+- **LLM Judge** (Claude Sonnet 4.5) rated two answers as a **tie** (both 9/10)
+- **$\mathcal{F}_S$ metric** correctly scored the hallucinating answer lower (0.25 vs 0.32)
+
+The hallucination: One answer fabricated customer names ("Customers A, B, C") when the source only mentioned "three direct customers" without naming them. This subtle fabrication could mislead downstream LLM systems into researching non-existent entities.
+
 ## 📂 Repository Structure
 
 ```
