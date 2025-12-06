@@ -63,17 +63,17 @@ def create():
                 ui.label(f"{display_results['F_S']:.4f}").classes('text-h3 font-bold text-primary')
                 ui.label('F_S').classes('text-caption text-grey-6')
 
-            # SEP Total card
+            # SEP card
             with ui.card().classes('flex-1 p-6'):
-                ui.label('Total Entropy Production').classes('text-subtitle1 text-grey-7')
+                ui.label('Semantic Entropy Production').classes('text-subtitle1 text-grey-7')
                 ui.label(f"{display_results['SEP_total']:.4f} bits").classes('text-h3 font-bold')
-                ui.label('SEP_total').classes('text-caption text-grey-6')
+                ui.label('SEP').classes('text-caption text-grey-6')
 
-            # SEP System card
+            # System Entropy Change card
             with ui.card().classes('flex-1 p-6'):
-                ui.label('System Entropy Production').classes('text-subtitle1 text-grey-7')
+                ui.label('System Entropy Change').classes('text-subtitle1 text-grey-7')
                 ui.label(f"{display_results['SEP_system']:.4f} bits").classes('text-h3 font-bold')
-                ui.label('SEP_system').classes('text-caption text-grey-6')
+                ui.label('Ṡ').classes('text-caption text-grey-6')
 
         # Entropy metrics
         ui.label('Entropy Metrics').classes('text-h6 mb-4')
@@ -269,7 +269,7 @@ def create():
                             # Metrics
                             story.append(Paragraph("Analysis Metrics", heading_style))
                             story.append(Paragraph(f"• F_S (Semantic Faithfulness): {display_results['F_S']:.4f}", metric_style))
-                            story.append(Paragraph(f"• SEP Total: {display_results['SEP_total']:.4f} bits", metric_style))
+                            story.append(Paragraph(f"• SEP (Semantic Entropy Production): {display_results['SEP_total']:.4f} bits", metric_style))
                             story.append(Paragraph(f"• Selection Method: {export_state.get('selection_method', 'Manual')}", metric_style))
                             story.append(Paragraph(f"• Prompt ID: {export_state['selected_prompt_id']}", metric_style))
                             story.append(Spacer(1, 12))
@@ -416,8 +416,8 @@ def generate_markdown_report(question, context, answer, prompt_id, fs_score, sel
 | Metric | Value |
 |--------|-------|
 | F_S (Semantic Faithfulness) | {metrics['F_S']:.4f} |
-| SEP Total | {metrics['SEP_total']:.4f} bits |
-| SEP System | {metrics['SEP_system']:.4f} bits |
+| SEP (Semantic Entropy Production) | {metrics['SEP_total']:.4f} bits |
+| Ṡ (System Entropy Change) | {metrics['SEP_system']:.4f} bits |
 | H(Q) | {metrics['H_Q']:.4f} bits |
 | H(C) | {metrics['H_C']:.4f} bits |
 | H(A) | {metrics['H_A']:.4f} bits |
@@ -565,36 +565,50 @@ def display_statistics(results):
             ui.label('Optimization Details').classes('text-subtitle1 font-bold mb-2')
             with ui.grid(columns=2).classes('w-full gap-4'):
                 ui.label('Iterations:').classes('text-grey-7')
-                ui.label(f"{results['iterations']}").classes('font-bold')
+                iterations = results.get('iterations', 'N/A')
+                ui.label(f"{iterations}").classes('font-bold')
 
                 ui.label('Converged:').classes('text-grey-7')
-                converged_icon = 'check_circle' if results['converged'] else 'warning'
-                converged_color = 'positive' if results['converged'] else 'warning'
-                ui.icon(converged_icon).props(f'color={converged_color}')
+                converged = results.get('converged')
+                if converged is not None:
+                    converged_icon = 'check_circle' if converged else 'warning'
+                    converged_color = 'positive' if converged else 'warning'
+                    ui.icon(converged_icon).props(f'color={converged_color}')
+                else:
+                    ui.label('N/A').classes('font-bold text-grey-6')
 
                 ui.label('Clusters:').classes('text-grey-7')
-                ui.label(f"{results['n_clusters']}").classes('font-bold')
+                ui.label(f"{results.get('n_clusters', 'N/A')}").classes('font-bold')
 
-        # Sentence counts
-        with ui.card().classes('w-full p-4'):
-            ui.label('Sentence Counts').classes('text-subtitle1 font-bold mb-2')
-            with ui.grid(columns=2).classes('w-full gap-4'):
-                ui.label('Question sentences:').classes('text-grey-7')
-                ui.label(f"{len(results.get('question_sentences', []))}").classes('font-bold')
+        # Sentence counts (only show if data is available)
+        q_sents = results.get('question_sentences', [])
+        c_sents = results.get('context_sentences', [])
+        a_sents = results.get('answer_sentences', [])
 
-                ui.label('Context sentences:').classes('text-grey-7')
-                ui.label(f"{len(results.get('context_sentences', []))}").classes('font-bold')
+        if q_sents or c_sents or a_sents:
+            with ui.card().classes('w-full p-4'):
+                ui.label('Sentence Counts').classes('text-subtitle1 font-bold mb-2')
+                with ui.grid(columns=2).classes('w-full gap-4'):
+                    ui.label('Question sentences:').classes('text-grey-7')
+                    ui.label(f"{len(q_sents)}").classes('font-bold')
 
-                ui.label('Answer sentences:').classes('text-grey-7')
-                ui.label(f"{len(results.get('answer_sentences', []))}").classes('font-bold')
+                    ui.label('Context sentences:').classes('text-grey-7')
+                    ui.label(f"{len(c_sents)}").classes('font-bold')
+
+                    ui.label('Answer sentences:').classes('text-grey-7')
+                    ui.label(f"{len(a_sents)}").classes('font-bold')
+        else:
+            with ui.card().classes('w-full p-4 bg-grey-1'):
+                ui.label('Sentence Counts').classes('text-subtitle1 font-bold mb-2')
+                ui.label('Sentence data not available (using cached distributions)').classes('text-body2 text-grey-6')
 
         # Interpretation guide
         with ui.card().classes('w-full p-4'):
             ui.label('Interpretation Guide').classes('text-subtitle1 font-bold mb-2')
             with ui.column().classes('gap-2'):
                 ui.label('• F_S (Semantic Faithfulness): Higher is better (max = 1.0)').classes('text-body2')
-                ui.label('• SEP_total: Lower indicates closer alignment with optimal channel').classes('text-body2')
-                ui.label('• SEP_system: Difference between answer and context entropy').classes('text-body2')
+                ui.label('• SEP: Lower indicates closer alignment with optimal channel').classes('text-body2')
+                ui.label('• Ṡ (System Entropy Change): Difference between answer and context entropy').classes('text-body2')
                 ui.label('• H(Q), H(C), H(A): Information content in bits').classes('text-body2')
 
 

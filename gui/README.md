@@ -73,7 +73,8 @@ A simple, Apple-inspired web application for analyzing semantic faithfulness of 
 ### Results Page
 - **Key Metrics Display**:
   - Semantic Faithfulness (F_S): 0-1 scale
-  - System Entropy Production (SEP)
+  - Semantic Entropy Production (SEP)
+  - System Entropy Change (Ṡ)
   - Entropy values H(Q), H(C), H(A)
 - **Interactive Visualizations**:
   - Probability distributions over semantic topics
@@ -263,8 +264,8 @@ Actual interpretation depends on the specific use case and should be calibrated 
 
 ### Semantic Entropy Production (SEP)
 Measures irreversibility in the answer generation process.
-- **SEP_system**: H(A) - H(C), semantic expansion/compression
-- **SEP_total**: Divergence from optimal channel
+- **Ṡ (System Entropy Change)**: H(A) - H(C), semantic expansion/compression
+- **Ṡ_m (Dissipated Heat)**: SEP - Ṡ (see paper for formula)
 
 ## Technical Details
 

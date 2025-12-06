@@ -71,8 +71,8 @@ The Semantic Faithfulness SDM system consists of two main components:
 │  │   │   │                    OUTPUT METRICS                           │    │  │ │
 │  │   │   │                                                             │    │  │ │
 │  │   │   │   F_S = 1 / (1 + D_min)         Semantic Faithfulness       │    │  │ │
-│  │   │   │   SEP_system = H(A) - H(C)      System Entropy Production   │    │  │ │
-│  │   │   │   SEP_total ≈ 1/F_S - 1         Total Entropy Production    │    │  │ │
+│  │   │   │   Ṡ = H(A) - H(C)               System Entropy Change       │    │  │ │
+│  │   │   │   Ṡ_m                           Dissipated Heat             │    │  │ │
 │  │   │   │                                                             │    │  │ │
 │  │   │   └────────────────────────────────────────────────────────────┘    │  │ │
 │  │   │                                                                      │  │ │
@@ -354,8 +354,8 @@ The Semantic Faithfulness SDM system consists of two main components:
 │   │  ┌──────────────────────────────────────────────────────────────────┐   ││  │
 │   │  │  D_min = KL(A* || Q*)                                            │   ││  │
 │   │  │  F_S = 1 / (1 + D_min)                                           │   ││  │
-│   │  │  SEP_system = H(A) - H(C)                                        │   ││  │
-│   │  │  SEP_total ≈ D_min                                               │   ││  │
+│   │  │  Ṡ = H(A) - H(C)                                                 │   ││  │
+│   │  │  Ṡ_m (see paper)                                                 │   ││  │
 │   │  └──────────────────────────────────────────────────────────────────┘   ││  │
 │   │                                                                          ││  │
 │   └──────────────────────────────────────────────────────────────────────────┘│  │
@@ -364,9 +364,9 @@ The Semantic Faithfulness SDM system consists of two main components:
 │   ┌────────────────────────────────────────────────────────────────────────┐  │  │
 │   │                                                                         │  │  │
 │   │  {                                                                      │  │  │
-│   │    "prompt_0": { "F_S": 0.8234, "SEP_system": 0.12, ... },             │  │  │
-│   │    "prompt_1": { "F_S": 0.8891, "SEP_system": 0.08, ... },             │  │  │
-│   │    "prompt_2": { "F_S": 0.8567, "SEP_system": 0.10, ... },             │  │  │
+│   │    "prompt_0": { "F_S": 0.8234, "S_dot": 0.12, ... },                  │  │  │
+│   │    "prompt_1": { "F_S": 0.8891, "S_dot": 0.08, ... },                  │  │  │
+│   │    "prompt_2": { "F_S": 0.8567, "S_dot": 0.10, ... },                  │  │  │
 │   │    ...                                                                  │  │  │
 │   │  }                                                                      │  │  │
 │   │                                                                         │  │  │

@@ -79,10 +79,10 @@ def main():
     print(f"\nMinimal KL Divergence (D_min): {results['D_min']:.3f} bits")
     print(f"  (Distance from optimal channel)")
 
-    print(f"\nTotal Entropy Production (SEP_total): {results['SEP_total']:.3f} bits")
+    print(f"\nSemantic Entropy Production (SEP): {results['SEP_total']:.3f} bits")
     print(f"  (Irreversibility in information flow)")
 
-    print(f"\nSystem Entropy Production (SEP_system): {results['SEP_system']:.3f} bits")
+    print(f"\nSystem Entropy Change (Ṡ): {results['SEP_system']:.3f} bits")
     print(f"  Interpretation: {'Semantic expansion' if results['SEP_system'] > 0 else 'Semantic compression'}")
 
     print(f"\nOptimization converged: {results['converged']}")

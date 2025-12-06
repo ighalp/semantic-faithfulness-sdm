@@ -123,36 +123,28 @@ View LLM as a **bipartite information engine**:
 - Sub-system X: Observable (context C → answer A)
 - Sub-system Y: Hidden controller (Maxwell's demon)
 
-### 4.2 System Entropy Production
+### 4.2 System Entropy Change
 
 **Semantic expansion/compression:**
 
 ```
-SEP_system = H(A) - H(C) = Σ_j p_j^(a) log(1/p_j^(a)) - Σ_i p_i^(c) log(1/p_i^(c))
+Ṡ = H(A) - H(C) = Σ_j p_j^(a) log(1/p_j^(a)) - Σ_i p_i^(c) log(1/p_i^(c))
 ```
 
 Interpretation:
-- SEP_system > 0: Semantic expansion (LLM elaborates)
-- SEP_system < 0: Semantic compression (LLM summarizes)
-- SEP_system = 0: Semantic conservation
+- Ṡ > 0: Semantic expansion (LLM elaborates)
+- Ṡ < 0: Semantic compression (LLM summarizes)
+- Ṡ = 0: Semantic conservation
 
-### 4.3 Total Entropy Production
+### 4.3 Dissipated Heat
 
 **Irreversibility of information flow:**
 
-```
-SEP_total ≈ 1/F_S - 1 + Σ_j ν_j* (p_j^(q) - p_j^(a))
-```
-
-For high faithfulness (F_S close to 1), the correction term is negligible:
-
-```
-SEP_total ≈ D_min = 1/F_S - 1
-```
+The dissipated heat Ṡ_m quantifies the irreversibility of the LLM's answer generation process. See the paper for the full derivation and formula.
 
 This establishes the **inverse relationship**:
-- High F_S → Low SEP_total (faithful answers have low entropy production)
-- Low F_S → High SEP_total (unfaithful answers have high entropy production)
+- High F_S → Low Ṡ_m (faithful answers have low dissipated heat)
+- Low F_S → High Ṡ_m (unfaithful answers have high dissipated heat)
 
 ## 5. Practical Considerations
 

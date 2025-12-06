@@ -110,13 +110,13 @@ def main():
     print(f"  Mean: {np.mean(fs_scores):.3f} ± {np.std(fs_scores):.3f}")
     print(f"  Spread: {(max(fs_scores) - min(fs_scores))/np.mean(fs_scores)*100:.1f}%")
 
-    print(f"\nTotal Entropy Production (SEP_total):")
+    print(f"\nSemantic Entropy Production (SEP):")
     print(f"  Range: [{min(sep_scores):.3f}, {max(sep_scores):.3f}] bits")
     print(f"  Mean: {np.mean(sep_scores):.3f} ± {np.std(sep_scores):.3f} bits")
 
     # Inverse correlation check
     correlation = np.corrcoef(fs_scores, sep_scores)[0, 1]
-    print(f"\nCorrelation F_S vs SEP_total: r = {correlation:.3f}")
+    print(f"\nCorrelation F_S vs SEP: r = {correlation:.3f}")
     print(f"  Expected: negative (high F_S → low SEP)")
 
     print("\n" + "="*80)

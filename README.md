@@ -29,8 +29,8 @@ The SDM framework models LLM question-answering as information flow through tran
 **Semantic Faithfulness** measures how closely the answer channel approximates the optimal goal channel by minimizing KL divergence.
 
 **Semantic Entropy Production** decomposes into:
-- System entropy production: $\dot{S}_{\text{sys}} = H(A) - H(C)$ (semantic expansion/compression)
-- Total entropy production: $\dot{S}_{\text{total}} \approx 1/\mathcal{F}_S - 1$ (divergence from optimality)
+- System entropy change: $\overset{.}{S} = H(A) - H(C)$ (semantic expansion/compression)
+- Dissipated heat: $\overset{.}{S}_m$ (see paper for formula)
 
 #### Core Algorithms and Principles
 
@@ -132,8 +132,8 @@ results = compute_semantic_faithfulness(
 )
 
 print(f"Semantic Faithfulness (F_S): {results['F_S']:.3f}")
-print(f"Total Entropy Production: {results['SEP_total']:.3f} bits")
-print(f"System Entropy Production: {results['SEP_system']:.3f} bits")
+print(f"Semantic Entropy Production (SEP): {results['SEP_total']:.3f} bits")
+print(f"System Entropy Change (Ṡ): {results['SEP_system']:.3f} bits")
 ```
 
 ### Example: Comparing Multiple Answers

@@ -86,8 +86,8 @@ def compute_semantic_faithfulness(
     Returns:
         Dictionary containing:
             - F_S: Semantic Faithfulness score [0, 1]
-            - SEP_total: Total entropy production (bits)
-            - SEP_system: System entropy production (bits) (if return_all=True)
+            - SEP: Semantic Entropy Production (bits)
+            - Ṡ: System Entropy Change = H(A) - H(C) (bits) (if return_all=True)
             - D_min: Minimal KL divergence (if return_all=True)
             - ... other metrics ...
 
