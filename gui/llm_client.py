@@ -28,9 +28,7 @@ class LLMModel(Enum):
 
     # Anthropic models (2025)
     CLAUDE_SONNET_4_5 = "claude-sonnet-4-5-20250929"
-    CLAUDE_OPUS_4_1 = "claude-opus-4-1"
-    CLAUDE_SONNET_4 = "claude-sonnet-4"
-    CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
+    CLAUDE_SONNET_4 = "claude-sonnet-4-20250514"
     CLAUDE_SONNET_3_5 = "claude-3-5-sonnet-20241022"
 
     # Google Gemini models (2025)
@@ -115,15 +113,14 @@ Generate {num_paraphrases} paraphrases:"""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.8,
-                max_tokens=1000
+                temperature=0.8
             )
             content = response.choices[0].message.content
 
         elif self.provider == LLMProvider.ANTHROPIC:
             response = await client.messages.create(
                 model=self.model.value,
-                max_tokens=1000,
+                max_tokens=8192,
                 temperature=0.8,
                 system=system_prompt,
                 messages=[
@@ -136,7 +133,7 @@ Generate {num_paraphrases} paraphrases:"""
             full_prompt = f"{system_prompt}\n\n{user_prompt}"
             response = await client.generate_content_async(
                 full_prompt,
-                generation_config={'temperature': 0.8, 'max_output_tokens': 1000}
+                generation_config={'temperature': 0.8, 'max_output_tokens': 8192}
             )
             content = response.text
 
@@ -190,15 +187,14 @@ Please provide a detailed answer based on the context above."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=temperature,
-                max_tokens=2000
+                temperature=temperature
             )
             return response.choices[0].message.content.strip()
 
         elif self.provider == LLMProvider.ANTHROPIC:
             response = await client.messages.create(
                 model=self.model.value,
-                max_tokens=2000,
+                max_tokens=8192,
                 temperature=temperature,
                 system=system_prompt,
                 messages=[
@@ -211,7 +207,7 @@ Please provide a detailed answer based on the context above."""
             full_prompt = f"{system_prompt}\n\n{user_prompt}"
             response = await client.generate_content_async(
                 full_prompt,
-                generation_config={'temperature': temperature, 'max_output_tokens': 2000}
+                generation_config={'temperature': temperature, 'max_output_tokens': 8192}
             )
             return response.text.strip()
 
@@ -288,7 +284,20 @@ Your task is to compare two answers and determine which one is better. Evaluate 
 
 IMPORTANT: Base your evaluation ONLY on how well each answer represents the information in the context. Do not prefer answers simply because they are longer or more detailed if that additional detail is not supported by the context.
 
-Provide scores from 1-10 for each answer on each criterion, overall scores, determine the winner (A, B, or TIE), and provide a detailed explanation of your judgment."""
+CRITICAL - Extracting phrases for highlighting:
+When you write your detailed explanation, you will discuss specific strengths, weaknesses, and differences. For each answer, you MUST extract the EXACT phrases from the answer text that you are discussing in your explanation.
+
+For example, if in your explanation you write: "Answer A explicitly states the 53% international revenue figure..."
+Then key_differences_a MUST include the exact phrase from Answer A like: "53% of NVIDIA's revenue was generated from sales outside the United States"
+
+The phrases you extract should:
+- Be EXACT quotes from the answer text (copy-paste, not paraphrased)
+- Be the specific content you reference in your detailed explanation
+- Include enough context to be meaningful (typically 10-150 characters)
+- Cover the main points you discuss for each answer's strengths/weaknesses
+- NOT be single words or short fragments like "Executive Summary" - extract the full meaningful statement
+
+Provide scores from 1-10 for each answer on each criterion, overall scores, determine the winner (A, B, or TIE), the key phrases you discuss, and provide a detailed explanation of your judgment."""
 
         system_prompt = custom_system_prompt if custom_system_prompt else default_system_prompt
 
@@ -343,12 +352,22 @@ Please evaluate which answer better represents the information from the context.
                 "coherence_b": {"type": "integer", "minimum": 1, "maximum": 10},
                 "relevance_a": {"type": "integer", "minimum": 1, "maximum": 10},
                 "relevance_b": {"type": "integer", "minimum": 1, "maximum": 10},
+                "key_differences_a": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "EXACT quotes from Answer A that you discuss in your explanation. Copy-paste the actual phrases you reference when describing A's strengths/weaknesses. 3-6 phrases, each 10-150 chars."
+                },
+                "key_differences_b": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "EXACT quotes from Answer B that you discuss in your explanation. Copy-paste the actual phrases you reference when describing B's strengths/weaknesses. 3-6 phrases, each 10-150 chars."
+                },
                 "explanation": {
                     "type": "string",
                     "description": "Detailed explanation of the judgment"
                 }
             },
-            "required": ["winner", "score_a", "score_b", "explanation"]
+            "required": ["winner", "score_a", "score_b", "key_differences_a", "key_differences_b", "explanation"]
         }
 
         import json
@@ -364,7 +383,6 @@ Please evaluate which answer better represents the information from the context.
                         {"role": "user", "content": user_prompt}
                     ],
                     temperature=0.1,
-                    max_tokens=1500,
                     response_format={
                         "type": "json_schema",
                         "json_schema": {
@@ -380,7 +398,7 @@ Please evaluate which answer better represents the information from the context.
                 # Anthropic uses tool_use for structured output
                 response = await client.messages.create(
                     model=self.model.value,
-                    max_tokens=1500,
+                    max_tokens=8192,
                     temperature=0.1,
                     system=system_prompt,
                     messages=[
@@ -406,7 +424,7 @@ Please evaluate which answer better represents the information from the context.
                 # Recreate client with JSON mode
                 generation_config = genai.GenerationConfig(
                     temperature=0.1,
-                    max_output_tokens=1500,
+                    max_output_tokens=8192,
                     response_mime_type="application/json",
                     response_schema={
                         "type": "object",
@@ -422,9 +440,11 @@ Please evaluate which answer better represents the information from the context.
                             "coherence_b": {"type": "integer"},
                             "relevance_a": {"type": "integer"},
                             "relevance_b": {"type": "integer"},
+                            "key_differences_a": {"type": "array", "items": {"type": "string"}},
+                            "key_differences_b": {"type": "array", "items": {"type": "string"}},
                             "explanation": {"type": "string"}
                         },
-                        "required": ["winner", "score_a", "score_b", "explanation"]
+                        "required": ["winner", "score_a", "score_b", "key_differences_a", "key_differences_b", "explanation"]
                     }
                 )
                 full_prompt = f"{system_prompt}\n\n{user_prompt}"
@@ -460,6 +480,10 @@ Please evaluate which answer better represents the information from the context.
                             'A': result.get('relevance_a', 5),
                             'B': result.get('relevance_b', 5)
                         }
+                    },
+                    'key_differences': {
+                        'A': result.get('key_differences_a', []),
+                        'B': result.get('key_differences_b', [])
                     }
                 }
             else:
@@ -467,6 +491,7 @@ Please evaluate which answer better represents the information from the context.
                     'winner': 'TIE',
                     'explanation': 'Could not parse evaluation response',
                     'scores': {'A': 5, 'B': 5},
+                    'key_differences': {'A': [], 'B': []},
                     'criteria_breakdown': {}
                 }
 
@@ -475,7 +500,8 @@ Please evaluate which answer better represents the information from the context.
                 'winner': 'ERROR',
                 'explanation': f'Evaluation failed: {str(e)}',
                 'scores': {'A': 0, 'B': 0},
-                'criteria_breakdown': {}
+                'criteria_breakdown': {},
+                'key_differences': {'A': [], 'B': []}
             }
 
 

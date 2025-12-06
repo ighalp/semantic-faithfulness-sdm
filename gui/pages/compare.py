@@ -236,7 +236,7 @@ def create():
                 # Legend
                 ui.separator().classes('my-4')
                 with ui.row().classes('items-center gap-4'):
-                    ui.html('<span style="background-color: #ffeb3b; padding: 2px 8px;">Highlighted</span>', sanitize=False)
+                    ui.html('<span style="background-color: #64b5f6; padding: 2px 8px;">Highlighted</span>', sanitize=False)
                     ui.label('= Text unique to this version or substantially different').classes('text-caption text-grey-6')
 
         # Selection controls card

@@ -210,7 +210,7 @@ def generate_diff_html(text1: str, text2: str, side: str, similarity_threshold: 
             # Find and wrap with highlight span
             result_html = re.sub(
                 f'({escaped})',
-                r'<span style="background-color: #ffeb3b; padding: 2px;">\1</span>',
+                r'<span style="background-color: #64b5f6; padding: 2px;">\1</span>',
                 result_html,
                 count=1
             )
@@ -238,8 +238,56 @@ def generate_diff_html(text1: str, text2: str, side: str, similarity_threshold: 
             # Find and wrap with highlight span
             result_html = re.sub(
                 f'({escaped})',
-                r'<span style="background-color: #ffeb3b; padding: 2px;">\1</span>',
+                r'<span style="background-color: #64b5f6; padding: 2px;">\1</span>',
                 result_html,
                 count=1
             )
         return result_html
+
+
+def apply_llm_highlights(text: str, phrases_to_highlight: list) -> str:
+    """
+    Apply LLM-specified highlights to text.
+
+    This function takes the original text and a list of exact phrases identified
+    by the LLM Judge as semantically significant differences, then highlights them.
+
+    Args:
+        text: The original answer text
+        phrases_to_highlight: List of exact text phrases to highlight
+
+    Returns:
+        HTML string with highlighted phrases and markdown formatting applied
+    """
+    if not text:
+        return ""
+
+    if not phrases_to_highlight:
+        # No phrases to highlight, just convert markdown to HTML
+        return markdown_to_html(text)
+
+    # First convert markdown to HTML
+    html = markdown_to_html(text)
+
+    # Apply highlights for each phrase
+    for phrase in phrases_to_highlight:
+        if not phrase or len(phrase) < 3:  # Skip very short phrases
+            continue
+
+        # Escape the phrase for regex matching
+        # The phrase needs to be HTML-escaped since we're searching in HTML
+        escaped_phrase = phrase.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        escaped_for_regex = re.escape(escaped_phrase)
+
+        # Try to find and highlight the phrase (case-insensitive for flexibility)
+        pattern = f'({escaped_for_regex})'
+
+        html = re.sub(
+            pattern,
+            r'<span style="background-color: #64b5f6; padding: 2px; border-radius: 2px;" title="Key difference identified by LLM Judge">\1</span>',
+            html,
+            count=1,  # Only highlight first occurrence to avoid over-highlighting
+            flags=re.IGNORECASE
+        )
+
+    return html

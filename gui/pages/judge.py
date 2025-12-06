@@ -13,7 +13,7 @@ from datetime import datetime
 # Add parent directory for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from llm_client import LLMClient, LLMProvider, LLMModel
-from pages.markdown_utils import generate_diff_html, markdown_to_html
+from pages.markdown_utils import generate_diff_html, markdown_to_html, apply_llm_highlights
 
 
 def create():
@@ -112,7 +112,8 @@ def create():
             'right_pid': default_right,
             'result': None,
             'is_running': False,
-            'recommended_pid': None
+            'recommended_pid': None,
+            'key_differences': None  # Will store {'A': [...], 'B': [...]} after judge runs
         }
 
         # Explanation card
@@ -153,6 +154,13 @@ def create():
             fs_right = fs_scores.get(right_pid)
 
             with comparison_container:
+                # Check if we have LLM-provided key differences for the current answer pair
+                use_llm_highlights = (
+                    judge_state.get('key_differences') is not None and
+                    judge_state.get('compared_left') == left_pid and
+                    judge_state.get('compared_right') == right_pid
+                )
+
                 with ui.row().classes('w-full gap-4'):
                     # Left pane
                     with ui.card().classes('flex-1 p-6'):
@@ -160,12 +168,19 @@ def create():
                             ui.label(f'Answer A: {left_pid}').classes('text-h6')
                             if left_pid == initial_pid:
                                 ui.badge('Initial', color='blue').props('outline')
+                            if use_llm_highlights:
+                                ui.badge('LLM Highlights', color='purple').props('outline')
                         if fs_left is not None:
                             color = 'text-red-600' if fs_scores and fs_left == min(fs_scores.values()) else 'text-primary'
                             ui.label(f"F_S: {fs_left:.4f}").classes(f'text-subtitle2 {color} mb-2')
                         ui.label(f"{len(left_answer)} characters").classes('text-caption text-grey-6 mb-4')
 
-                        html_left = generate_diff_html(left_answer, right_answer, side='left')
+                        # Use LLM highlights if available, otherwise fall back to diff-based highlights
+                        if use_llm_highlights:
+                            key_diffs_a = judge_state['key_differences'].get('A', [])
+                            html_left = apply_llm_highlights(left_answer, key_diffs_a)
+                        else:
+                            html_left = generate_diff_html(left_answer, right_answer, side='left')
                         ui.html(html_left, sanitize=False).classes('text-body2 whitespace-pre-wrap max-h-96 overflow-auto')
 
                     # Right pane
@@ -174,12 +189,19 @@ def create():
                             ui.label(f'Answer B: {right_pid}').classes('text-h6')
                             if fs_scores and fs_right is not None and fs_right == min(fs_scores.values()):
                                 ui.badge('Lowest F_S', color='red').props('outline')
+                            if use_llm_highlights:
+                                ui.badge('LLM Highlights', color='purple').props('outline')
                         if fs_right is not None:
                             color = 'text-red-600' if fs_scores and fs_right == min(fs_scores.values()) else 'text-primary'
                             ui.label(f"F_S: {fs_right:.4f}").classes(f'text-subtitle2 {color} mb-2')
                         ui.label(f"{len(right_answer)} characters").classes('text-caption text-grey-6 mb-4')
 
-                        html_right = generate_diff_html(left_answer, right_answer, side='right')
+                        # Use LLM highlights if available, otherwise fall back to diff-based highlights
+                        if use_llm_highlights:
+                            key_diffs_b = judge_state['key_differences'].get('B', [])
+                            html_right = apply_llm_highlights(right_answer, key_diffs_b)
+                        else:
+                            html_right = generate_diff_html(left_answer, right_answer, side='right')
                         ui.html(html_right, sanitize=False).classes('text-body2 whitespace-pre-wrap max-h-96 overflow-auto')
 
         # Selection controls
@@ -448,6 +470,8 @@ Provide scores from 1-10 for each answer on each criterion, overall scores, dete
                 # Store which model was used as judge
                 judge_state['judge_model'] = model_str
                 judge_state['judge_provider'] = provider_str
+                # Store key differences for LLM-based highlighting
+                judge_state['key_differences'] = result.get('key_differences', {'A': [], 'B': []})
 
                 # Determine recommended answer
                 if result['winner'] == 'A':
@@ -459,6 +483,9 @@ Provide scores from 1-10 for each answer on each criterion, overall scores, dete
                     fs_left = fs_scores.get(left_pid, 0)
                     fs_right = fs_scores.get(right_pid, 0)
                     judge_state['recommended_pid'] = left_pid if fs_left >= fs_right else right_pid
+
+                # Refresh the comparison display with LLM-based highlights
+                update_comparison()
 
                 # Display results using the actual compared prompts
                 display_results(result, judge_state['compared_left'], judge_state['compared_right'], model_str)
@@ -488,9 +515,56 @@ Provide scores from 1-10 for each answer on each criterion, overall scores, dete
             results_container.clear()
 
             with results_container:
-                with ui.row().classes('items-center gap-4 mb-4'):
-                    ui.label('LLM Judge Evaluation Results').classes('text-h5')
-                    ui.badge(f'Judge: {model_display_name}', color='purple').props('outline')
+                with ui.row().classes('items-center justify-between w-full mb-4'):
+                    with ui.row().classes('items-center gap-4'):
+                        ui.label('LLM Judge Evaluation Results').classes('text-h5')
+                        ui.badge(f'Judge: {model_display_name}', color='purple').props('outline')
+
+                    # Export Verdict buttons
+                    async def export_verdict_md():
+                        left_answer = answers_dict[display_left]['answer']
+                        right_answer = answers_dict[display_right]['answer']
+
+                        md_content = generate_verdict_export(
+                            judge_model_name=model_display_name,
+                            left_pid=display_left,
+                            right_pid=display_right,
+                            judge_result=result,
+                            left_answer=left_answer,
+                            right_answer=right_answer,
+                            fs_scores=fs_scores
+                        )
+
+                        filename = f"verdict_{display_left}_vs_{display_right}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+                        ui.download(md_content.encode('utf-8'), filename)
+                        ui.notify(f'Verdict exported as {filename}', type='positive')
+
+                    async def export_verdict_pdf():
+                        try:
+                            left_answer = answers_dict[display_left]['answer']
+                            right_answer = answers_dict[display_right]['answer']
+
+                            pdf_content = generate_verdict_pdf(
+                                judge_model_name=model_display_name,
+                                left_pid=display_left,
+                                right_pid=display_right,
+                                judge_result=result,
+                                left_answer=left_answer,
+                                right_answer=right_answer,
+                                fs_scores=fs_scores
+                            )
+
+                            filename = f"verdict_{display_left}_vs_{display_right}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                            ui.download(pdf_content, filename)
+                            ui.notify(f'Verdict exported as {filename}', type='positive')
+                        except ImportError:
+                            ui.notify('PDF export requires reportlab. Install with: pip install reportlab', type='negative')
+                        except Exception as e:
+                            ui.notify(f'PDF export error: {str(e)}', type='negative')
+
+                    with ui.row().classes('gap-2'):
+                        ui.button('Export Verdict (MD)', icon='description', on_click=export_verdict_md).props('color=purple outline size=sm')
+                        ui.button('Export Verdict (PDF)', icon='picture_as_pdf', on_click=export_verdict_pdf).props('color=purple outline size=sm')
 
                 # Winner card
                 with ui.card().classes('w-full p-6 mb-4 bg-amber-50'):
@@ -559,6 +633,40 @@ Provide scores from 1-10 for each answer on each criterion, overall scores, dete
                                     ui.label('B').classes('text-center text-green-600 font-bold')
                                 else:
                                     ui.label('=').classes('text-center text-grey-600')
+
+                # Key Phrases Discussed (from LLM)
+                key_diffs = result.get('key_differences', {})
+                diffs_a = key_diffs.get('A', [])
+                diffs_b = key_diffs.get('B', [])
+                if diffs_a or diffs_b:
+                    with ui.card().classes('w-full p-6 mb-4'):
+                        with ui.row().classes('items-center gap-2 mb-4'):
+                            ui.label('Key Phrases Discussed').classes('text-h6')
+                            ui.badge('Referenced in Analysis', color='purple').props('outline')
+                        ui.label('These exact phrases from each answer are discussed in the detailed analysis above:').classes('text-caption text-grey-6 mb-4')
+
+                        with ui.row().classes('w-full gap-4'):
+                            # Answer A differences
+                            with ui.column().classes('flex-1'):
+                                ui.label(f'Answer A ({display_left})').classes('text-subtitle2 font-bold text-blue-700 mb-2')
+                                if diffs_a:
+                                    for diff in diffs_a:
+                                        with ui.row().classes('items-start gap-2 mb-2'):
+                                            ui.icon('format_quote', size='sm').classes('text-blue-400')
+                                            ui.label(f'"{diff}"').classes('text-body2 italic bg-blue-50 p-2 rounded')
+                                else:
+                                    ui.label('No key differences identified').classes('text-caption text-grey-5')
+
+                            # Answer B differences
+                            with ui.column().classes('flex-1'):
+                                ui.label(f'Answer B ({display_right})').classes('text-subtitle2 font-bold text-green-700 mb-2')
+                                if diffs_b:
+                                    for diff in diffs_b:
+                                        with ui.row().classes('items-start gap-2 mb-2'):
+                                            ui.icon('format_quote', size='sm').classes('text-green-400')
+                                            ui.label(f'"{diff}"').classes('text-body2 italic bg-green-50 p-2 rounded')
+                                else:
+                                    ui.label('No key differences identified').classes('text-caption text-grey-5')
 
                 # Explanation
                 with ui.card().classes('w-full p-6 mb-4'):
@@ -878,3 +986,356 @@ def generate_markdown_export(question, context, answer, prompt_id, fs_score, sel
 *Report generated by Semantic Faithfulness Analyzer - LLM Judge*
 """
     return md
+
+
+def generate_verdict_export(
+    judge_model_name: str,
+    left_pid: str,
+    right_pid: str,
+    judge_result: dict,
+    left_answer: str,
+    right_answer: str,
+    fs_scores: dict
+) -> str:
+    """
+    Generate a comprehensive LLM Judge Verdict export in Markdown format.
+
+    Args:
+        judge_model_name: Display name of the judge model
+        left_pid: Prompt ID for Answer A
+        right_pid: Prompt ID for Answer B
+        judge_result: The full judge result dictionary
+        left_answer: Full text of Answer A
+        right_answer: Full text of Answer B
+        fs_scores: Dictionary of F_S scores by prompt_id
+
+    Returns:
+        Markdown formatted verdict document
+    """
+    from datetime import datetime
+
+    winner = judge_result.get('winner', 'TIE')
+    scores = judge_result.get('scores', {})
+    criteria = judge_result.get('criteria_breakdown', {})
+    key_diffs = judge_result.get('key_differences', {})
+    explanation = judge_result.get('explanation', 'No explanation provided')
+
+    # Determine winner text
+    if winner == 'A':
+        winner_text = f"{left_pid} (Answer A)"
+    elif winner == 'B':
+        winner_text = f"{right_pid} (Answer B)"
+    else:
+        winner_text = "TIE - No clear winner"
+
+    fs_left = fs_scores.get(left_pid, 'N/A')
+    fs_right = fs_scores.get(right_pid, 'N/A')
+    if isinstance(fs_left, float):
+        fs_left = f"{fs_left:.4f}"
+    if isinstance(fs_right, float):
+        fs_right = f"{fs_right:.4f}"
+
+    md = f"""# LLM Judge Verdict
+
+---
+
+## Summary
+
+| Field | Value |
+|-------|-------|
+| **LLM Judge** | {judge_model_name} |
+| **Date** | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |
+| **Comparison** | {left_pid} vs {right_pid} |
+| **Verdict** | **The Winner is {winner_text}** |
+
+---
+
+## Scores Overview
+
+| Answer | LLM Score | F_S Score |
+|--------|-----------|-----------|
+| **{left_pid}** (Answer A) | {scores.get('A', 'N/A')}/10 | {fs_left} |
+| **{right_pid}** (Answer B) | {scores.get('B', 'N/A')}/10 | {fs_right} |
+
+"""
+
+    # Criteria breakdown
+    if criteria:
+        md += """## Criteria Breakdown
+
+| Criterion | Answer A | Answer B | Difference | Better |
+|-----------|----------|----------|------------|--------|
+"""
+        for criterion, scores_dict in criteria.items():
+            score_a = scores_dict.get('A', 0)
+            score_b = scores_dict.get('B', 0)
+            diff = score_a - score_b
+            if diff > 0:
+                better = "A"
+                diff_str = f"+{diff}"
+            elif diff < 0:
+                better = "B"
+                diff_str = str(diff)
+            else:
+                better = "="
+                diff_str = "0"
+            md += f"| {criterion.replace('_', ' ').title()} | {score_a}/10 | {score_b}/10 | {diff_str} | {better} |\n"
+        md += "\n"
+
+    # Key semantic differences
+    diffs_a = key_diffs.get('A', [])
+    diffs_b = key_diffs.get('B', [])
+
+    if diffs_a or diffs_b:
+        md += """---
+
+## Key Semantic Differences
+
+*These phrases were identified by the LLM Judge as representing meaningful differences between the answers.*
+
+"""
+        if diffs_a:
+            md += f"### Distinctive phrases in {left_pid} (Answer A):\n\n"
+            for i, diff in enumerate(diffs_a, 1):
+                md += f'{i}. > "{diff}"\n\n'
+
+        if diffs_b:
+            md += f"### Distinctive phrases in {right_pid} (Answer B):\n\n"
+            for i, diff in enumerate(diffs_b, 1):
+                md += f'{i}. > "{diff}"\n\n'
+
+    # Detailed explanation
+    md += f"""---
+
+## Detailed Analysis
+
+{explanation}
+
+---
+
+## Full Answer Texts
+
+### {left_pid} (Answer A)
+
+{left_answer}
+
+---
+
+### {right_pid} (Answer B)
+
+{right_answer}
+
+---
+
+*Verdict generated by Semantic Faithfulness Analyzer - LLM Judge*
+*Model: {judge_model_name}*
+"""
+    return md
+
+
+def generate_verdict_pdf(
+    judge_model_name: str,
+    left_pid: str,
+    right_pid: str,
+    judge_result: dict,
+    left_answer: str,
+    right_answer: str,
+    fs_scores: dict
+) -> bytes:
+    """
+    Generate a comprehensive LLM Judge Verdict export in PDF format.
+
+    Args:
+        judge_model_name: Display name of the judge model
+        left_pid: Prompt ID for Answer A
+        right_pid: Prompt ID for Answer B
+        judge_result: The full judge result dictionary
+        left_answer: Full text of Answer A
+        right_answer: Full text of Answer B
+        fs_scores: Dictionary of F_S scores by prompt_id
+
+    Returns:
+        PDF content as bytes
+    """
+    from datetime import datetime
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
+    import io
+
+    winner = judge_result.get('winner', 'TIE')
+    scores = judge_result.get('scores', {})
+    criteria = judge_result.get('criteria_breakdown', {})
+    key_diffs = judge_result.get('key_differences', {})
+    explanation = judge_result.get('explanation', 'No explanation provided')
+
+    # Determine winner text
+    if winner == 'A':
+        winner_text = f"{left_pid} (Answer A)"
+    elif winner == 'B':
+        winner_text = f"{right_pid} (Answer B)"
+    else:
+        winner_text = "TIE - No clear winner"
+
+    fs_left = fs_scores.get(left_pid, 'N/A')
+    fs_right = fs_scores.get(right_pid, 'N/A')
+    if isinstance(fs_left, float):
+        fs_left = f"{fs_left:.4f}"
+    if isinstance(fs_right, float):
+        fs_right = f"{fs_right:.4f}"
+
+    # Create PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+
+    styles = getSampleStyleSheet()
+
+    # Define custom styles
+    title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=20, spaceAfter=20, fontName='Helvetica-Bold', textColor=colors.HexColor('#4a148c'))
+    h1_style = ParagraphStyle('H1', parent=styles['Heading1'], fontSize=14, spaceAfter=10, spaceBefore=16, fontName='Helvetica-Bold', textColor=colors.HexColor('#1a237e'))
+    h2_style = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=12, spaceAfter=8, spaceBefore=12, fontName='Helvetica-Bold')
+    body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, spaceAfter=6, leading=14)
+    quote_style = ParagraphStyle('Quote', parent=styles['Normal'], fontSize=9, spaceAfter=4, leftIndent=20, textColor=colors.HexColor('#37474f'), fontName='Helvetica-Oblique')
+    meta_style = ParagraphStyle('Meta', parent=styles['Normal'], fontSize=9, textColor=colors.gray, spaceAfter=4)
+    verdict_style = ParagraphStyle('Verdict', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', textColor=colors.HexColor('#1b5e20'), spaceAfter=12)
+
+    story = []
+
+    # Title
+    story.append(Paragraph("LLM Judge Verdict", title_style))
+    story.append(Spacer(1, 12))
+
+    # Summary table
+    summary_data = [
+        ['Field', 'Value'],
+        ['LLM Judge', judge_model_name],
+        ['Date', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+        ['Comparison', f'{left_pid} vs {right_pid}'],
+    ]
+    summary_table = Table(summary_data, colWidths=[1.5*inch, 4.5*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8eaf6')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 16))
+
+    # Verdict
+    story.append(Paragraph(f"Verdict: The Winner is {winner_text}", verdict_style))
+    story.append(Spacer(1, 16))
+
+    # Scores Overview
+    story.append(Paragraph("Scores Overview", h1_style))
+    scores_data = [
+        ['Answer', 'LLM Score', 'F_S Score'],
+        [f'{left_pid} (Answer A)', f"{scores.get('A', 'N/A')}/10", str(fs_left)],
+        [f'{right_pid} (Answer B)', f"{scores.get('B', 'N/A')}/10", str(fs_right)],
+    ]
+    scores_table = Table(scores_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+    scores_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e3f2fd')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(scores_table)
+    story.append(Spacer(1, 16))
+
+    # Criteria Breakdown
+    if criteria:
+        story.append(Paragraph("Criteria Breakdown", h1_style))
+        criteria_data = [['Criterion', 'Answer A', 'Answer B', 'Diff', 'Better']]
+        for criterion, scores_dict in criteria.items():
+            score_a = scores_dict.get('A', 0)
+            score_b = scores_dict.get('B', 0)
+            diff = score_a - score_b
+            if diff > 0:
+                better = "A"
+                diff_str = f"+{diff}"
+            elif diff < 0:
+                better = "B"
+                diff_str = str(diff)
+            else:
+                better = "="
+                diff_str = "0"
+            criteria_data.append([criterion.replace('_', ' ').title(), f'{score_a}/10', f'{score_b}/10', diff_str, better])
+
+        criteria_table = Table(criteria_data, colWidths=[1.8*inch, 1*inch, 1*inch, 0.8*inch, 0.8*inch])
+        criteria_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fff3e0')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(criteria_table)
+        story.append(Spacer(1, 16))
+
+    # Key Semantic Differences
+    diffs_a = key_diffs.get('A', [])
+    diffs_b = key_diffs.get('B', [])
+
+    if diffs_a or diffs_b:
+        story.append(Paragraph("Key Semantic Differences", h1_style))
+        story.append(Paragraph("These phrases were identified by the LLM Judge as representing meaningful differences between the answers.", meta_style))
+        story.append(Spacer(1, 8))
+
+        if diffs_a:
+            story.append(Paragraph(f"Distinctive phrases in {left_pid} (Answer A):", h2_style))
+            for i, diff in enumerate(diffs_a, 1):
+                safe_diff = diff.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                story.append(Paragraph(f'{i}. "{safe_diff}"', quote_style))
+            story.append(Spacer(1, 8))
+
+        if diffs_b:
+            story.append(Paragraph(f"Distinctive phrases in {right_pid} (Answer B):", h2_style))
+            for i, diff in enumerate(diffs_b, 1):
+                safe_diff = diff.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                story.append(Paragraph(f'{i}. "{safe_diff}"', quote_style))
+            story.append(Spacer(1, 8))
+
+    # Detailed Analysis
+    story.append(Paragraph("Detailed Analysis", h1_style))
+    # Split explanation into paragraphs and escape HTML
+    for para in explanation.split('\n\n'):
+        if para.strip():
+            safe_para = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Handle basic markdown bold
+            import re
+            safe_para = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', safe_para)
+            story.append(Paragraph(safe_para, body_style))
+    story.append(Spacer(1, 16))
+
+    # Full Answer Texts
+    story.append(Paragraph(f"{left_pid} (Answer A)", h1_style))
+    for para in left_answer.split('\n\n'):
+        if para.strip():
+            safe_para = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            story.append(Paragraph(safe_para, body_style))
+    story.append(Spacer(1, 16))
+
+    story.append(Paragraph(f"{right_pid} (Answer B)", h1_style))
+    for para in right_answer.split('\n\n'):
+        if para.strip():
+            safe_para = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            story.append(Paragraph(safe_para, body_style))
+    story.append(Spacer(1, 16))
+
+    # Footer
+    story.append(Paragraph(f"Verdict generated by Semantic Faithfulness Analyzer - LLM Judge | Model: {judge_model_name}", meta_style))
+
+    doc.build(story)
+    return buffer.getvalue()

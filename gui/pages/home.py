@@ -12,7 +12,7 @@ def create():
             with ui.column().classes('flex-1 gap-2'):
                 ui.label('Paraphrase Me').classes('text-h2 font-bold')
                 ui.label('LLM Semantic Assistant - Information-Theoretic Evaluation').classes('text-h5 text-grey-7')
-            ui.image('/static/LLM_Maxwell_demon.png').classes('w-56 h-auto rounded-lg shadow-md')
+            ui.image('/static/LLM_Maxwell_demon_logo.png').classes('w-56 h-auto rounded-lg shadow-md')
 
         # What is this tool card
         with ui.card().classes('w-full p-6 mb-6 bg-blue-50'):
