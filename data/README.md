@@ -139,6 +139,11 @@ If you use the NVIDIA 10-K example dataset, please cite our paper:
 @article{halperin2025faithfulness,
   title={Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations},
   author={Halperin, Igor},
-  year={2025}
+  journal={arXiv preprint arXiv:2512.05156},
+  year={2025},
+  url={https://arxiv.org/abs/2512.05156}
 }
 ```
+
+- arXiv: [https://arxiv.org/abs/2512.05156](https://arxiv.org/abs/2512.05156)
+- SSRN: [https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5858022](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5858022)

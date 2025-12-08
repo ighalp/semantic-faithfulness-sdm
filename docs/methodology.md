@@ -203,7 +203,7 @@ The SF and SEP metrics are related but capture distinct aspects:
 
 Empirically, they show moderate negative correlation (r ≈ -0.6): higher faithfulness generally implies lower entropy production, but the relationship is not deterministic.
 
-For full theoretical derivations, see [Halperin (2025), "Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations"](https://github.com/ighalp/semantic-faithfulness-sdm).
+For full theoretical derivations, see [Halperin (2025), "Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations"](https://arxiv.org/abs/2512.05156).
 
 ## 4. Practical Considerations
 

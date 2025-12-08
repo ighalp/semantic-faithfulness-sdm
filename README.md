@@ -258,12 +258,13 @@ If you use this package in your research, please cite:
 @article{halperin2025faithfulness,
   title={Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations},
   author={Halperin, Igor},
-  note={To be published},
-  year={2025}
+  journal={arXiv preprint arXiv:2512.05156},
+  year={2025},
+  url={https://arxiv.org/abs/2512.05156}
 }
 ```
 
-**Note**: Full citation details will be available upon publication. Please also consider citing the foundational SDM papers listed in the References section below.
+Please also consider citing the foundational SDM papers listed in the References section below.
 
 ## 🤝 Contributing
 
@@ -278,9 +279,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### This Work
 
 **Halperin, I. (2025).** "Semantic Faithfulness and Entropy Production Measures to Tame Your LLM Demons and Manage Hallucinations."
-*To be published soon.*
+   - arXiv: [https://arxiv.org/abs/2512.05156](https://arxiv.org/abs/2512.05156)
+   - SSRN: [https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5858022](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5858022)
 
-This paper introduces the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic Entropy Production (SEP) metrics implemented in this package.
+   *This paper introduces the Semantic Faithfulness ($\mathcal{F}_S$) and Semantic Entropy Production (SEP) metrics implemented in this package.*
 
 ### Foundational SDM Papers
 
